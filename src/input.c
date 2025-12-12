@@ -571,44 +571,29 @@ void pollKeyboard(device* dev) {
 		}
 	}
 	else {
-		if (!(*addr_isKeyboardOnScreen)) {
-			// when editing a park, right trigger acts as l1
-			if (getKeyState(keyboardState, keybinds.switchRevert)) {
-				dev->controlData[3] |= 0x01 << 2;
-				dev->controlData[16] = 0xff;
-			}
-
-			if (getKeyState(keyboardState, keybinds.nollie)) {
-				dev->controlData[3] |= 0x01 << 0;
-				dev->controlData[18] = 0xff;
-			}
-
-			if (getKeyState(keyboardState, keybinds.leftSpin)) {
-				dev->controlData[20] |= 0x01 << 1;
-			}
-			if (getKeyState(keyboardState, keybinds.rightSpin)) {
-				dev->controlData[20] |= 0x01 << 0;
-			}
+		if (getKeyState(keyboardState, keybinds.leftSpin) || (isInMenu && menuKeyStates.rot_left == 1)) {
+			dev->controlData[3] |= 0x01 << 2;
+			dev->controlData[16] = 0xff;
+			dev->controlData[3] |= 0x01 << 0;
+			dev->controlData[18] = 0xff;
 		}
-		else {
-			if (getKeyState(keyboardState, keybinds.nollie) || (isInMenu && menuKeyStates.rot_left == 1)) {
-				dev->controlData[3] |= 0x01 << 2;
-				dev->controlData[16] = 0xff;
-				dev->controlData[3] |= 0x01 << 0;
-				dev->controlData[18] = 0xff;
-			}
-			if (getKeyState(keyboardState, keybinds.switchRevert) || (isInMenu && menuKeyStates.rot_right == 1)) {
-				dev->controlData[3] |= 0x01 << 3;
-				dev->controlData[17] = 0xff;
-				dev->controlData[3] |= 0x01 << 1;
-				dev->controlData[19] = 0xff;
-			}
-			if (getKeyState(keyboardState, keybinds.leftSpin)) {
-				dev->controlData[20] |= 0x01 << 1;
-			}
-			if (getKeyState(keyboardState, keybinds.rightSpin) || (isInMenu && menuKeyStates.zoom == 1)) {
-				dev->controlData[20] |= 0x01 << 0;
-			}
+
+		if (getKeyState(keyboardState, keybinds.rightSpin) || (isInMenu && menuKeyStates.rot_right == 1)) {
+			dev->controlData[3] |= 0x01 << 3;
+			dev->controlData[17] = 0xff;
+			dev->controlData[3] |= 0x01 << 1;
+			dev->controlData[19] = 0xff;
+		}
+
+		if (getKeyState(keyboardState, keybinds.switchRevert)) {
+			dev->controlData[3] |= 0x01 << 3;
+			dev->controlData[17] = 0xff;
+			dev->controlData[3] |= 0x01 << 1;
+			dev->controlData[19] = 0xff;
+			dev->controlData[3] |= 0x01 << 2;
+			dev->controlData[16] = 0xff;
+			dev->controlData[3] |= 0x01 << 0;
+			dev->controlData[18] = 0xff;
 		}
 	}
 

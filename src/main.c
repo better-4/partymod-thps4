@@ -16,7 +16,7 @@
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0
-#define VERSION_NUMBER_FIX 10
+#define VERSION_NUMBER_FIX 11
 
 // FIXME: still broken, not sure why
 double ledgeWarpFix(double n) {
