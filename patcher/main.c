@@ -86,9 +86,6 @@ int main(int argc, char **argv) {
 	}
 
 end:
-	printf("Press any key to continue\n");
-	getch();
-
 	return 0;
 }
 
