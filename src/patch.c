@@ -3,6 +3,14 @@
 #include <stdint.h>
 #include <windows.h>
 
+void patchJmp(void* addr, void* dest) {
+    DWORD oldProtect;
+    VirtualProtect(addr, 5, PAGE_EXECUTE_READWRITE, &oldProtect);
+    *(uint8_t*)addr = 0xE9; // JMP rel32
+    *(uint32_t*)((uint8_t*)addr + 1) = (uint32_t)dest - (uint32_t)addr - 5;
+    VirtualProtect(addr, 5, oldProtect, &oldProtect);
+}
+
 void patchNop(void *addr, size_t size) {
     DWORD oldProtect;
 

@@ -14,6 +14,18 @@
 INCBIN(GrindScriptsPCAddDD, "patches/grindscripts_pcadddd.bps");	// old script mod to map dropdown to spine transfer
 INCBIN(GrindScriptsPs2ToPc, "patches/grindscripts_ps2topc.bps");	// script mod to enable dropdowns with isWIN32 instead of isPs2
 
+// grind-dropdown button combo mode variants (PS2 controls only; built on top of GrindScriptsPs2ToPc).
+// each changes the GrindRelease table's L2/R2 Trigger entries in scripts\grindscripts.qb.
+INCBIN(GrindScriptsPs2ToPcL2Only, "patches/grindscripts_ps2topc_l2only.bps");	// only L2 triggers a dropdown; always drops left
+INCBIN(GrindScriptsPs2ToPcR2Only, "patches/grindscripts_ps2topc_r2only.bps");	// only R2 triggers a dropdown; always drops right
+INCBIN(GrindScriptsPs2ToPcBoth, "patches/grindscripts_ps2topc_both.bps");	// requires holding L2+R2 together; always drops right
+
+// L1/R1-based grind-dropdown variants (same GrindRelease table, buttons swapped to L1/R1)
+INCBIN(GrindScriptsPs2ToPcL1R1Either, "patches/grindscripts_ps2topc_l1r1_either.bps");	// L1 or R1; L1 drops left, R1 drops right
+INCBIN(GrindScriptsPs2ToPcL1Only, "patches/grindscripts_ps2topc_l1_only.bps");	// only L1 triggers a dropdown; always drops left
+INCBIN(GrindScriptsPs2ToPcR1Only, "patches/grindscripts_ps2topc_r1_only.bps");	// only R1 triggers a dropdown; always drops right
+INCBIN(GrindScriptsPs2ToPcBothL1R1, "patches/grindscripts_ps2topc_both_l1r1.bps");	// requires holding L1+R1 together; always drops right
+
 map_t *scriptMap;
 
 int applyPatch(uint8_t *patch, size_t patchLen, uint8_t *input, size_t inputLen, uint8_t **output, size_t *outputLen);
@@ -86,10 +98,39 @@ void registerPatch(char *name, unsigned int sz, char *data) {
 	printf("Registered patch for %s\n", name);
 }
 
-void registerInputScriptPatches(uint8_t usingPs2Controls) {
+void registerInputScriptPatches(uint8_t usingPs2Controls, uint8_t dropdownMode) {
 	if (usingPs2Controls) {
-		registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcSize, gGrindScriptsPs2ToPcData);
+		// dropdownMode: 0=Either (default), 1=L2 only, 2=R2 only, 3=Both (hold L2+R2),
+		// 4=L1/R1 Either, 5=L1 only, 6=R1 only, 7=Both (hold L1+R1)
+		switch (dropdownMode) {
+			case 1:
+				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcL2OnlySize, gGrindScriptsPs2ToPcL2OnlyData);
+				break;
+			case 2:
+				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcR2OnlySize, gGrindScriptsPs2ToPcR2OnlyData);
+				break;
+			case 3:
+				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcBothSize, gGrindScriptsPs2ToPcBothData);
+				break;
+			case 4:
+				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcL1R1EitherSize, gGrindScriptsPs2ToPcL1R1EitherData);
+				break;
+			case 5:
+				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcL1OnlySize, gGrindScriptsPs2ToPcL1OnlyData);
+				break;
+			case 6:
+				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcR1OnlySize, gGrindScriptsPs2ToPcR1OnlyData);
+				break;
+			case 7:
+				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcBothL1R1Size, gGrindScriptsPs2ToPcBothL1R1Data);
+				break;
+			default:
+				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcSize, gGrindScriptsPs2ToPcData);
+				break;
+		}
 	} else {
+		// non-PS2-controls path: GrindRelease is restructured entirely by this older patch,
+		// so dropdown button-combo mode isn't wired up for this path yet - always uses the default.
 		registerPatch("scripts\\grindscripts.qb", gGrindScriptsPCAddDDSize, gGrindScriptsPCAddDDData);
 	}
 }

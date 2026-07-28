@@ -3,6 +3,6 @@
 
 void patchScriptHook();
 void initScriptPatches();
-void registerInputScriptPatches(uint8_t usingPs2Controls);
+void registerInputScriptPatches(uint8_t usingPs2Controls, uint8_t dropdownMode);
 
 #endif

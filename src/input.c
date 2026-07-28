@@ -63,6 +63,12 @@ struct inputsettings inputsettings;
 struct keybinds keybinds;
 struct controllerbinds padbinds;
 
+// genuine physical L1/R1 shoulder state, updated every frame in pollController.
+// completely independent of leftSpin/rightSpin's controlData slot (and therefore
+// SpinButtonMode) - used only by checkSpineTransferButtons' L1/R1-based modes.
+uint8_t physicalL1Held = 0;
+uint8_t physicalR1Held = 0;
+
 uint8_t isUsingKeyboard = 1;
 
 struct playerslot {
@@ -245,6 +251,12 @@ void pollController(device *dev, SDL_GameController *controller) {
 	if (SDL_GameControllerGetAttached(controller)) {
 		dev->isValid = 1;
 		dev->isPluggedIn = 1;
+
+		// track genuine physical L1/R1 directly, regardless of any bind - used by
+		// checkSpineTransferButtons' L1/R1-based modes so they're never affected by
+		// SpinButtonMode remapping leftSpin/rightSpin elsewhere.
+		physicalL1Held = getButton(controller, CONTROLLER_BUTTON_LEFTSHOULDER) ? 1 : 0;
+		physicalR1Held = getButton(controller, CONTROLLER_BUTTON_RIGHTSHOULDER) ? 1 : 0;
 
 		// buttons
 		if (getButton(controller, padbinds.menu)) {
@@ -988,10 +1000,10 @@ void __stdcall initManager() {
 	initSDLControllers();
 
 	if (inputsettings.isPs2Controls) {
-		registerInputScriptPatches(1);
+		registerInputScriptPatches(1, inputsettings.dropdownMode);
 		patchPs2Buttons();
 	} else if (inputsettings.dropdownEnabled) {
-		registerInputScriptPatches(0);
+		registerInputScriptPatches(0, inputsettings.dropdownMode);
 	}
 }
 
@@ -1012,14 +1024,42 @@ uint8_t movieKeyboardInput() {
 	return 1;
 }
 
+// reads R2 (comp+0x834) and L2 (comp+0x87c) off the game's native skater control
+// struct and applies whichever combo mode is configured. plain per-frame reads,
+// no held-across-frames state needed: the decomp confirms these two bytes are
+// used as simple "currently held" flags elsewhere in the game's own code too
+// (including native R2 && L2 checks), so there's nothing hidden to track.
+uint8_t __cdecl checkSpineTransferButtons(void *comp) {
+	uint8_t r2 = *(uint8_t *)((uint8_t *)comp + 0x834);
+	uint8_t l2 = *(uint8_t *)((uint8_t *)comp + 0x87c);
+
+	switch (inputsettings.spineTransferMode) {
+		case SPINE_MODE_L2_ONLY:
+			return l2 != 0;
+		case SPINE_MODE_R2_ONLY:
+			return r2 != 0;
+		case SPINE_MODE_BOTH:
+			return (r2 != 0) && (l2 != 0);
+		case SPINE_MODE_L1_ONLY:
+			return physicalL1Held != 0;
+		case SPINE_MODE_R1_ONLY:
+			return physicalR1Held != 0;
+		case SPINE_MODE_L1R1_BOTH:
+			return (physicalL1Held != 0) && (physicalR1Held != 0);
+		case SPINE_MODE_L1R1_EITHER:
+			return (physicalL1Held != 0) || (physicalR1Held != 0);
+		case SPINE_MODE_EITHER:
+		default:
+			return (r2 != 0) || (l2 != 0);
+	}
+}
+
 #define spine_buttons_asm(SUCCESS, FAIL) __asm {	\
 	__asm push eax	\
 	__asm push ebx	\
-	__asm mov ebx, comp	\
-	__asm mov al, byte ptr [ebx + 0x834]	/* R2 */	\
-	__asm test al, al	\
-	__asm jne success	\
-	__asm mov al, byte ptr [ebx + 0x87c]	/* L2 */	\
+	__asm push comp	\
+	__asm call checkSpineTransferButtons	\
+	__asm add esp, 4	\
 	__asm test al, al	\
 	__asm jne success	\
 	\
