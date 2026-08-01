@@ -5,9 +5,10 @@
 
 #include <SDL2/SDL.h>
 
-#include <global.h>
-#include <patch.h>
 #include <config.h>
+#include <global.h>
+#include <log.h>
+#include <patch.h>
 #include <script.h>
 
 // device is +0x100
@@ -85,7 +86,7 @@ void setUsingKeyboard(uint8_t usingKeyboard) {
 }
 
 void addController(int idx) {
-	printf("Detected controller \"%s\"\n", SDL_GameControllerNameForIndex(idx));
+	printLog("Detected controller \"%s\"\n", SDL_GameControllerNameForIndex(idx));
 
 	SDL_GameController *controller = SDL_GameControllerOpen(idx);
 
@@ -130,27 +131,27 @@ void addplayer(SDL_GameController *controller) {
 			
 			numplayers++;
 
-			printf("Added player %d: %s\n", i + 1, SDL_GameControllerName(controller));
+			printLog("Added player %d: %s\n", i + 1, SDL_GameControllerName(controller));
 		}
 	} else {
-		printf("Already two players, not adding\n");
+		printLog("Already two players, not adding\n");
 	}
 }
 
 void pruneplayers() {
 	for (int i = 0; i < MAX_PLAYERS; i++) {
 		if (players[i].controller && !SDL_GameControllerGetAttached(players[i].controller)) {
-			printf("Pruned player %d\n", i + 1);
+			printLog("Pruned player %d\n", i + 1);
 
 			players[i].controller = NULL;
 			numplayers--;
-			printf("Remaining players: %d\n", numplayers);
+			printLog("Remaining players: %d\n", numplayers);
 		}
 	}
 }
 
 void removeController(SDL_GameController *controller) {
-	printf("Controller \"%s\" disconnected\n", SDL_GameControllerName(controller));
+	printLog("Controller \"%s\" disconnected\n", SDL_GameControllerName(controller));
 
 	int i = 0;
 
@@ -163,7 +164,7 @@ void removeController(SDL_GameController *controller) {
 
 		int playerIdx = SDL_GameControllerGetPlayerIndex(controller);
 		if (playerIdx != -1) {
-			printf("Removed player %d\n", playerIdx + 1);
+			printLog("Removed player %d\n", playerIdx + 1);
 			players[playerIdx].controller = NULL;
 			numplayers--;
 		}
@@ -176,12 +177,12 @@ void removeController(SDL_GameController *controller) {
 		controllerCount--;
 	} else {
 		//setActiveController(NULL);
-		printf("Did not find disconnected controller in list\n");
+		printLog("Did not find disconnected controller in list\n");
 	}
 }
 
 void initSDLControllers() {
-	printf("Initializing Controller Input\n");
+	printLog("Initializing Controller Input\n");
 
 	controllerCount = 0;
 	controllerListSize = 1;
@@ -759,7 +760,7 @@ void do_text_input(char* text) {
 			key_input(text[0], 0);
 		}
 		else {
-			printf("Input text '%s' > 1 byte!!\n");
+			printLog("Input text '%s' > 1 byte!!\n");
 		}
 	}
 }
@@ -770,7 +771,7 @@ void processEvent(SDL_Event *e) {
 			if (SDL_IsGameController(e->cdevice.which)) {
 				addController(e->cdevice.which);
 			} else {
-				printf("Not a game controller: %s\n", SDL_JoystickNameForIndex(e->cdevice.which));
+				printLog("Not a game controller: %s\n", SDL_JoystickNameForIndex(e->cdevice.which));
 			}
 			return;
 		case SDL_CONTROLLERDEVICEREMOVED: {
@@ -781,7 +782,7 @@ void processEvent(SDL_Event *e) {
 			return;
 		}
 		case SDL_JOYDEVICEADDED:
-			printf("Joystick added: %s\n", SDL_JoystickNameForIndex(e->jdevice.which));
+			printLog("Joystick added: %s\n", SDL_JoystickNameForIndex(e->jdevice.which));
 			return;
 		case SDL_KEYDOWN: 
 			setUsingKeyboard(1);
@@ -972,7 +973,7 @@ void __fastcall activate_actuators(device *dev, void *pad, int idx, int pct) {
 }
 
 void __stdcall initManager() {
-	printf("Initializing Manager!\n");
+	printLog("Initializing Manager!\n");
 
 	// init sdl here
 	SDL_Init(SDL_INIT_GAMECONTROLLER);
@@ -986,9 +987,9 @@ void __stdcall initManager() {
 	if (result) {
 		result = SDL_GameControllerAddMappingsFromFile(controllerDbPath);
 		if (result) {
-			printf("Loaded mappings\n");
+			printLog("Loaded mappings\n");
 		} else {
-			printf("Failed to load %s\n", controllerDbPath);
+			printLog("Failed to load %s\n", controllerDbPath);
 		}
 		
 	}

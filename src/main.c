@@ -7,22 +7,17 @@
 
 #include <SDL2/SDL.h>
 
-#include <patch.h>
+#include <config.h>
+#include <gfx.h>
 #include <global.h>
 #include <input.h>
-#include <config.h>
+#include <log.h>
+#include <patch.h>
 #include <script.h>
-#include <gfx.h>
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0
 #define VERSION_NUMBER_FIX 11
-
-
-
-
-
-
 
 
 // ============================================================================
@@ -176,14 +171,14 @@ static void ClearFlags(void* player, uint32_t bits) { *(uint32_t*)((uint8_t*)pla
 // Sends the initial "let me leave observer mode" request to the host.
 // If the caller IS the host, this is a loopback send to itself.
 void __fastcall RequestExitObserverMode(int localPlayerSingleton) {
-	printf("RequestExitObserverMode: enter, localPlayerSingleton=%08X\n", localPlayerSingleton);
+	printLog("RequestExitObserverMode: enter, localPlayerSingleton=%08X\n", localPlayerSingleton);
 	void* localPlayer = GetLocalPlayer((void*)localPlayerSingleton);
-	printf("RequestExitObserverMode: localPlayer=%p\n", localPlayer);
+	printLog("RequestExitObserverMode: localPlayer=%p\n", localPlayer);
 	if (localPlayer != 0 && IsObserving_(localPlayer)) {
-		printf("RequestExitObserverMode: sending 0x7C\n");
+		printLog("RequestExitObserverMode: sending 0x7C\n");
 		SendMsgToServer(*(void**)(localPlayerSingleton + 0x10), 0, MSG_ID_EXIT_OBSERVER_REQUEST, 0,
 			(void*)0x0, 0x80, 2, '\b', '\0', 0);
-		printf("RequestExitObserverMode: send returned\n");
+		printLog("RequestExitObserverMode: send returned\n");
 	}
 }
 
@@ -193,14 +188,14 @@ void __fastcall RequestExitObserverMode(int localPlayerSingleton) {
 // pending on the host's authoritative PlayerInfo, and replies with 0x7D
 // so the requester's own machine can proceed.
 int __cdecl HandleExitObserverRequest(int msgCtx) {
-	printf("HandleExitObserverRequest: enter, msgCtx=%p\n", (void*)msgCtx);
+	printLog("HandleExitObserverRequest: enter, msgCtx=%p\n", (void*)msgCtx);
 	if (msgCtx == 0) {
 		return 3;
 	}
 	void* gameNetManager = *(void**)(msgCtx + 0x4010);
 	int connId = *(int*)(msgCtx + 0x4008);
 	void* player = ResolvePlayer(gameNetManager, 0, connId);
-	printf("HandleExitObserverRequest: player=%p\n", player);
+	printLog("HandleExitObserverRequest: player=%p\n", player);
 	if (player != 0 && IsObserving_(player)) {
 		if (!IsLocalPlayer_(player)) {
 			// Remote requester: set PENDING_PLAYER on the host's own
@@ -253,14 +248,14 @@ static void __fastcall ForceAllOthersObserving(void* gameNetManager, void* self)
 	struct { void* vtable; void* dummy; } searchCtx = { (void*)0x0058aa94, 0 };
 	void* p = FirstPlayerInfo(gameNetManager, 0, &searchCtx, '\x01');
 	while (p != 0 && count < 16) {
-		printf("ForceAllOthersObserving: scan found p=%p (self=%d local=%d observing=%d)\n",
+		printLog("ForceAllOthersObserving: scan found p=%p (self=%d local=%d observing=%d)\n",
 			p, p == self, IsLocalPlayer_(p), IsObserving_(p));
 		if (p != self && !IsLocalPlayer_(p) && !IsObserving_(p)) {
 			targets[count++] = p;
 		}
 		p = NextPlayerInfo(&searchCtx);
 	}
-	printf("ForceAllOthersObserving: found %d targets\n", count);
+	printLog("ForceAllOthersObserving: found %d targets\n", count);
 
 	for (int i = 0; i < count; i++) {
 		ApplyObserverBookkeeping(gameNetManager, targets[i]);
@@ -269,7 +264,7 @@ static void __fastcall ForceAllOthersObserving(void* gameNetManager, void* self)
 		// PlayerInfo+0x18 is a connection-object pointer, not the ID itself.
 		void* connObjPtr = *(void**)((uint8_t*)targets[i] + 0x18);
 		uint32_t connId = *(uint32_t*)((uint8_t*)connObjPtr + 0x3c);
-		printf("ForceAllOthersObserving: target=%p connId=%08X (low byte=%02X)\n",
+		printLog("ForceAllOthersObserving: target=%p connId=%08X (low byte=%02X)\n",
 			targets[i], connId, connId & 0xFF);
 
 		// Send the REAL vanilla "proceed, enter observer mode" message
@@ -327,10 +322,10 @@ static FUN_00486d80_t Real_FUN_00486d80 = (FUN_00486d80_t)0x00486d80;
 // registers our 0x7C handler on it. Single call site in vanilla code.
 int __fastcall FUN_004869a0_Wrapper(void* this, int unused, char param_1, char param_2) {
 	int result = Real_FUN_004869a0(this, 0, param_1, param_2);
-	printf("FUN_004869a0_Wrapper: this=%p result=%d\n", this, result);
+	printLog("FUN_004869a0_Wrapper: this=%p result=%d\n", this, result);
 	if (result != 0) {
 		void* dispatcher = (void*)(*(int*)((int)this + 0xc) + 0xc);
-		printf("FUN_004869a0_Wrapper: dispatcher=%p\n", dispatcher);
+		printLog("FUN_004869a0_Wrapper: dispatcher=%p\n", dispatcher);
 		AddHandler(dispatcher, 0, MSG_ID_EXIT_OBSERVER_REQUEST, HandleExitObserverRequest, 3, this, 0x80);
 	}
 	return result;
@@ -344,7 +339,7 @@ void __fastcall FUN_00486d80_Wrapper(void* this, int unused, uint8_t param_1, ui
 	void* connPtr = *(void**)((int)this + param_4 * 4 + 0x10);
 	if (connPtr != 0) {
 		void* dispatcher = (void*)((int)connPtr + 0xc);
-		printf("FUN_00486d80_Wrapper: this=%p param_4=%d dispatcher=%p\n", this, param_4, dispatcher);
+		printLog("FUN_00486d80_Wrapper: this=%p param_4=%d dispatcher=%p\n", this, param_4, dispatcher);
 		AddHandler(dispatcher, 0, MSG_ID_EXIT_OBSERVER_PROCEED, HandleExitObserverProceed, 2, this, 0x80);
 	}
 }
@@ -353,13 +348,13 @@ void __fastcall FUN_00486d80_Wrapper(void* this, int unused, uint8_t param_1, ui
 // Hijacks the dead-in-retail "DebugRenderIgnore" CFunc slot. Reads the
 // local-player singleton and kicks off the whole request/reply chain.
 int __cdecl CFunc_RequestExitObserverMode(void* param_1) {
-	printf("CFunc_RequestExitObserverMode: enter\n");
+	printLog("CFunc_RequestExitObserverMode: enter\n");
 	void* localPlayerSingleton = *(void**)PARTY_ADDR_LOCAL_PLAYER_SINGLETON;
-	printf("CFunc_RequestExitObserverMode: single read\n");
+	printLog("CFunc_RequestExitObserverMode: single read\n");
 	if (localPlayerSingleton != 0) {
 		RequestExitObserverMode((int)localPlayerSingleton);
 	}
-	printf("CFunc_RequestExitObserverMode: returned from RequestExitObserverMode\n");
+	printLog("CFunc_RequestExitObserverMode: returned from RequestExitObserverMode\n");
 	return 1;
 }
 
@@ -436,14 +431,14 @@ int __cdecl CFunc_EnterObserverModePending(void* param_1) {
 	__try {
 		void* gameNetManager = *(void**)PARTY_ADDR_GAMENET_MANAGER;
 		void* self = GetLocalPlayer(gameNetManager);
-		printf("CFunc_EnterObserverModePending: self=%p\n", self);
+		printLog("CFunc_EnterObserverModePending: self=%p\n", self);
 		if (self != 0 && !IsObserving_(self)) {
 			ApplyObserverBookkeeping(gameNetManager, self);
-			printf("CFunc_EnterObserverModePending: applied\n");
+			printLog("CFunc_EnterObserverModePending: applied\n");
 		}
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER) {
-		printf("CFunc_EnterObserverModePending: caught exception, skipping this tick\n");
+		printLog("CFunc_EnterObserverModePending: caught exception, skipping this tick\n");
 	}
 	return 1;
 }
@@ -541,7 +536,7 @@ void __fastcall do_ground_friction(void *skater) {
 	float unk = *(float *)(*(int *)((int)skater + 0x634) + 0xe0);
 	float calcFriction = friction * (1.0 / 60.0) * 60.0 / length;
 
-	printf("ORIG: %f CORRECTED: %f FRAMETIME: %f UNK: %f FRICTION: %f LENGTH: %f CALCFRICTION: %f\n", origFriction, correctedFriction, frametime, unk, friction, length, calcFriction);*/
+	printLog("ORIG: %f CORRECTED: %f FRAMETIME: %f UNK: %f FRICTION: %f LENGTH: %f CALCFRICTION: %f\n", origFriction, correctedFriction, frametime, unk, friction, length, calcFriction);*/
 
 	if (!handle_slope(skater)) {
 		// do the calculation in double to avoid precision issues
@@ -723,7 +718,7 @@ void patchOnlineService(char *configFile) {
 
 	patchDWord(0x00544a1c + 1, masterServerStr);
 
-	printf("Patched online server: %s\n", domainStr);
+	printLog("Patched online server: %s\n", domainStr);
 }
 
 void initPatch() {
@@ -740,17 +735,12 @@ void initPatch() {
 
 	int isDebug = getIniBool("Miscellaneous", "Debug", 0, configFile);
 
-	if (1) {
-		AllocConsole();
-
-		FILE *fDummy;
-		freopen_s(&fDummy, "CONIN$", "r", stdin);
-		freopen_s(&fDummy, "CONOUT$", "w", stderr);
-		freopen_s(&fDummy, "CONOUT$", "w", stdout);
+	if (isDebug) {
+		initializeLogging();
 	}
-	printf("PARTYMOD for THPS4 %d.%d.%d\n", VERSION_NUMBER_MAJOR, VERSION_NUMBER_MINOR, VERSION_NUMBER_FIX);
 
-	printf("DIRECTORY: %s\n", executableDirectory);
+	printLog("PARTYMOD for THPS4 %d.%d.%d\n", VERSION_NUMBER_MAJOR, VERSION_NUMBER_MINOR, VERSION_NUMBER_FIX);
+	printLog("DIRECTORY: %s\n", executableDirectory);
 
 	//patchResolution();
 
@@ -758,7 +748,7 @@ void initPatch() {
 
 	/*int disableMovies = getIniBool("Miscellaneous", "NoMovie", 0, configFile);
 	if (disableMovies) {
-		printf("Disabling movies\n");
+		printLog("Disabling movies\n");
 		patchNoMovie();
 	}*/
 
@@ -794,7 +784,7 @@ void initPatch() {
 	rng_seed = time(NULL) & 0xffffffff;
 	srand(rng_seed);
 
-	printf("Patch Initialized\n");
+	printLog("Patch Initialized\n");
 }
 
 uint8_t did_logic = 0;
@@ -883,11 +873,21 @@ void patchIsPs2() {
 
 void patchPrintf() {
 	// these all seem to crash the game.  oh well!
-	//patchCall(0x00535ef0, printf);
+	//patchCall(0x00535ef0, printLog);
 	//patchByte(0x00535ef0, 0xe9);	// CALL to JMP
 	
-	patchCall(0x00405b60, printf);
-	patchByte(0x00405b60, 0xe9);	// CALL to JMP
+	// patchCall(0x00405b60, printLog);
+	// patchByte(0x00405b60, 0xe9);	// CALL to JMP
+}
+
+void patchScriptPrintf() {
+	// Patching OurPrintf (0x00535ef0) or 0x00405b60 gives partial success but crashes
+	// the game when entering the main menu. Instead, patch individual call sites in
+	// CFuncs::ScriptPrintf (0x0050a1e0) so we can call Printf from qb scripts.
+	patchCall(0x0050a3cb, printLog);
+	patchCall(0x0050a3e5, printLog);
+	patchCall(0x0050a4b5, printLog);
+	patchCall(0x0050a4fb, printLog);
 }
 
 int isCD() {
@@ -1148,6 +1148,7 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, L
 			//patchJmpTest();
 
 			//patchPrintf();
+			patchScriptPrintf();
 			//patchCD();
 
 			break;

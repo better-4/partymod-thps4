@@ -11,6 +11,7 @@ set(SOURCE_FILES
 	"${SRC}/config.c"
 	"${SRC}/input.c"
 	"${SRC}/hash.c"
+	"${SRC}/log.c"
 	"${SRC}/script.c"
 	"${SRC}/patches.c"
 	"${SRC}/gfx.c"
@@ -23,6 +24,7 @@ set(HEADER_FILES
 	"${SRC}/config.h"
 	"${SRC}/input.h"
 	"${SRC}/hash.h"
+	"${SRC}/log.h"
 	"${SRC}/script.h"
 	"${SRC}/gfx.h"
 )
@@ -31,7 +33,7 @@ list(APPEND INCLUDES ${THIRDPARTY})
 
 # add sdl2
 find_package(SDL2 REQUIRED)
-list(APPEND LIBS 
+list(APPEND LIBS
 	SDL2::SDL2
 	SDL2::SDL2main
 )
@@ -66,7 +68,7 @@ target_include_directories(partyconfig PUBLIC
 
 add_executable(incbin)
 
-target_sources(incbin PUBLIC 
+target_sources(incbin PUBLIC
 	"${THIRDPARTY}/incbin/incbin.c"
 	"${THIRDPARTY}/incbin/incbin.h"
 )
