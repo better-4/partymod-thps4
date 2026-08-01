@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <windows.h>
 
-FILE* fp_log;
+FILE* fp_log = NULL;
 
 
 void initializeLogging() {
@@ -28,8 +28,11 @@ int printLog(const char* fmt, ...) {
 	va_end(va);
 
     printf(rendered);
-    fputs(rendered, fp_log);
-    fflush(fp_log);
+
+    if (fp_log) {
+        fputs(rendered, fp_log);
+        fflush(fp_log);
+    }
 
     return ret;
 }
