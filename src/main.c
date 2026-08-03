@@ -74,6 +74,8 @@
 #define MSG_ID_EXIT_OBSERVER_REQUEST  0x7C   /* client -> host: "let me back in" */
 #define MSG_ID_EXIT_OBSERVER_PROCEED  0x7D   /* host -> requester: "proceed" */
 
+typedef void CStruct;
+
 // GetLocalPlayer(gameNetManager or local-player-singleton) -> PlayerInfo* for
 // whichever machine calls it. Confirmed __fastcall, single arg in ECX.
 static void* (__fastcall* GetLocalPlayer)(void*) = (void*)PARTY_ADDR_GET_LOCAL_PLAYER;
@@ -223,7 +225,7 @@ int __cdecl HandleExitObserverRequest(int msgCtx) {
 // We do this directly (rather than telling the target to run their own
 // EnterObserverMode) because the host is the authoritative owner of every
 // player's PlayerInfo, and this exact sequence is confirmed correct.
-static void __fastcall ApplyObserverBookkeeping(void* gameNetManager, void* player) {
+static void __fastcall ApplyObserverBookkeeping(void *gameNetManager, void* player) {
 	void* oldSkater = *(void**)((uint8_t*)player + 0x14);
 	RemovePlayerReason(gameNetManager, 0, player, 2);
 	if (oldSkater != 0) {
@@ -240,7 +242,7 @@ static void __fastcall ApplyObserverBookkeeping(void* gameNetManager, void* play
 // satisfies vanilla LoadPendingPlayers' undocumented precondition that
 // nobody else may still be actively skating when the HOST is the one
 // being reconstructed.
-static void __fastcall ForceAllOthersObserving(void* gameNetManager, void* self) {
+static void __fastcall ForceAllOthersObserving(void *gameNetManager, void* self) {
 	void* targets[16];
 	int count = 0;
 
@@ -346,7 +348,7 @@ void __fastcall FUN_00486d80_Wrapper(void* this, int unused, uint8_t param_1, ui
 // ---- 5. CFunc trigger the "Quit Observing" QB menu item calls ----
 // Hijacks the dead-in-retail "DebugRenderIgnore" CFunc slot. Reads the
 // local-player singleton and kicks off the whole request/reply chain.
-int __cdecl CFunc_RequestExitObserverMode(void* param_1) {
+int __cdecl CFunc_RequestExitObserverMode(CStruct *params) {
 	printLog("CFunc_RequestExitObserverMode: enter\n");
 	void* localPlayerSingleton = *(void**)PARTY_ADDR_LOCAL_PLAYER_SINGLETON;
 	printLog("CFunc_RequestExitObserverMode: single read\n");
@@ -356,8 +358,6 @@ int __cdecl CFunc_RequestExitObserverMode(void* param_1) {
 	printLog("CFunc_RequestExitObserverMode: returned from RequestExitObserverMode\n");
 	return 1;
 }
-
-
 
 // Fixes a real vanilla bug: LoadPendingPlayers hardcodes a promoted
 // player's new flags to just JUMPING_IN, silently dropping LOCAL_PLAYER
@@ -395,7 +395,7 @@ static int g_ourPendingPlayersCall = 0;
 // Toggled (not set/cleared separately) by QB, bracketing our own
 // LoadPendingPlayers calls. Hijacks the dead "debugrendermode" CFunc slot
 // (confirmed unused/safe earlier this session).
-int __cdecl CFunc_ToggleOurPendingPlayersFlag(void* param_1) {
+int __cdecl CFunc_ToggleOurPendingPlayersFlag(CStruct *params) {
 	g_ourPendingPlayersCall = !g_ourPendingPlayersCall;
 	return 1;
 }
@@ -426,7 +426,7 @@ static FUN_0048be30_t Real_FUN_0048be30 = (FUN_0048be30_t)0x0048be30;
 
 
 
-int __cdecl CFunc_EnterObserverModePending(void* param_1) {
+int __cdecl CFunc_EnterObserverModePending(CStruct* params) {
 	__try {
 		void* gameNetManager = *(void**)PARTY_ADDR_GAMENET_MANAGER;
 		void* self = GetLocalPlayer(gameNetManager);
@@ -467,6 +467,19 @@ void initExitObserverPatches(void) {
 	patchCall((void*)0x00500a26, FUN_004869a0_Wrapper);
 	patchCall((void*)0x0050d7b8, FUN_00486d80_Wrapper);
 	patchCall((void*)0x0050d85b, FUN_00486d80_Wrapper);
+}
+
+typedef int(__fastcall* GetText_t)(CStruct* struct, uint32_t checksum, const char** ret, int assert);
+GetText_t GetText = (GetText_t)(0x0); // TODO: find addr
+
+int __cdecl CFunc_GetIniBool(CStruct *struct) {
+	char *section, *key;
+
+	GetText(struct, 0xd28c8510, section, 0); // "section" (0xd28c8510)
+	GetText(struct, 0x756f5456, key, 0); // "key" (0x756f5456)
+
+	int ret = getIniBool(section, key, 0, configFile);
+	return ret;
 }
 
 // FIXME: still broken, not sure why

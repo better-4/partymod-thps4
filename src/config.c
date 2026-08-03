@@ -363,3 +363,4 @@ void loadControllerBinds(struct controllerbinds *bindsOut) {
 void patchLoadConfig() {
 	patchCall((void *)0x0040b9f7, loadSettings);
 }
+
