@@ -13,6 +13,7 @@ enum instruction {
 void patchNop(void *addr, size_t size);
 void patchInst(void *addr, enum instruction inst);
 void patchByte(void *addr, uint8_t val);
+void patchWord(void *addr, uint16_t val);
 void patchDWord(void *addr, uint32_t val);
 void patchFloat(void *addr, float val);
 void patchCall(void *addr, void *func);

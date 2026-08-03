@@ -61,7 +61,6 @@
 
 #define PARTY_ADDR_GAMENET_MANAGER      0x00ab5b48   // the GameNetManager singleton -- represents THIS machine's whole live network session (connections, player list, etc). NOT the same object as the local-player singleton below.
 #define PARTY_ADDR_GET_LOCAL_PLAYER     0x00489ac0
-#define PARTY_ADDR_CFUNC_DEBUG_RENDER_IGNORE 0x0050c4a0 // dead-in-retail CFunc slot ("DebugRenderIgnore") we hijack as our QB-callable trigger
 #define PARTY_FLAG_LOCAL_PLAYER   0x00000001
 #define PARTY_FLAG_OBSERVER       0x00000004
 #define PARTY_FLAG_PENDING_PLAYER 0x00000008
@@ -465,14 +464,10 @@ void patchSerialCheck(void) {
 }
 
 void initExitObserverPatches(void) {
-	patchJmp((void*)PARTY_ADDR_CFUNC_DEBUG_RENDER_IGNORE, CFunc_RequestExitObserverMode);
-	patchJmp((void*)0x0050bf00, CFunc_ToggleOurPendingPlayersFlag);   // hijacks "debugrendermode"
 	patchCall((void*)0x00500a26, FUN_004869a0_Wrapper);
 	patchCall((void*)0x0050d7b8, FUN_00486d80_Wrapper);
 	patchCall((void*)0x0050d85b, FUN_00486d80_Wrapper);
-	//patchJmp((void*)0x0051a770, CFunc_EnterObserverModePending);  /* hijacks "SkaterDebugOff" */
 }
-//
 
 // FIXME: still broken, not sure why
 double ledgeWarpFix(double n) {
@@ -783,6 +778,12 @@ void initPatch() {
 	// get some source of entropy for the music randomizer
 	rng_seed = time(NULL) & 0xffffffff;
 	srand(rng_seed);
+
+	initCFuncs();
+	addCFunc("RequestExitObserverMode", (void *)CFunc_RequestExitObserverMode);
+	addCFunc("ToggleOurPendingPlayersFlag", (void *)CFunc_ToggleOurPendingPlayersFlag);
+	printCFuncs();
+	patchCFuncs();
 
 	printLog("Patch Initialized\n");
 }

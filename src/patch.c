@@ -35,6 +35,14 @@ void patchByte(void* addr, uint8_t val) {
     VirtualProtect(addr, 1, oldProtect, &oldProtect);
 }
 
+void patchWord(void *addr, uint16_t val) {
+    DWORD oldProtect;
+
+    VirtualProtect(addr, 2, PAGE_EXECUTE_READWRITE, &oldProtect);
+    *(uint16_t *)addr = val;
+    VirtualProtect(addr, 2, oldProtect, &oldProtect);
+}
+
 void patchDWord(void *addr, uint32_t val) {
     DWORD oldProtect;
 

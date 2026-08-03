@@ -8,6 +8,7 @@ set(THIRDPARTY "${CMAKE_SOURCE_DIR}/thirdparty")
 set(SOURCE_FILES
 	"${SRC}/main.c"
 	"${SRC}/patch.c"
+	"${SRC}/cfuncs.c"
 	"${SRC}/config.c"
 	"${SRC}/input.c"
 	"${SRC}/hash.c"
@@ -19,6 +20,7 @@ set(SOURCE_FILES
 )
 
 set(HEADER_FILES
+	"${SRC}/cfuncs.h"
 	"${SRC}/global.h"
 	"${SRC}/patch.h"
 	"${SRC}/config.h"
