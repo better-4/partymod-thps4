@@ -14,6 +14,7 @@
 #include <log.h>
 #include <patch.h>
 #include <script.h>
+#include <qb.h>
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0
@@ -73,6 +74,8 @@
 #define PARTY_ADDR_RUN_SCRIPT   0x00413420   /* void __cdecl RunScript(const char*, void*, void*, char) */
 #define MSG_ID_EXIT_OBSERVER_REQUEST  0x7C   /* client -> host: "let me back in" */
 #define MSG_ID_EXIT_OBSERVER_PROCEED  0x7D   /* host -> requester: "proceed" */
+
+static char configFile[1024];
 
 // GetLocalPlayer(gameNetManager or local-player-singleton) -> PlayerInfo* for
 // whichever machine calls it. Confirmed __fastcall, single arg in ECX.
@@ -223,7 +226,7 @@ int __cdecl HandleExitObserverRequest(int msgCtx) {
 // We do this directly (rather than telling the target to run their own
 // EnterObserverMode) because the host is the authoritative owner of every
 // player's PlayerInfo, and this exact sequence is confirmed correct.
-static void __fastcall ApplyObserverBookkeeping(void* gameNetManager, void* player) {
+static void __fastcall ApplyObserverBookkeeping(void *gameNetManager, void* player) {
 	void* oldSkater = *(void**)((uint8_t*)player + 0x14);
 	RemovePlayerReason(gameNetManager, 0, player, 2);
 	if (oldSkater != 0) {
@@ -240,7 +243,7 @@ static void __fastcall ApplyObserverBookkeeping(void* gameNetManager, void* play
 // satisfies vanilla LoadPendingPlayers' undocumented precondition that
 // nobody else may still be actively skating when the HOST is the one
 // being reconstructed.
-static void __fastcall ForceAllOthersObserving(void* gameNetManager, void* self) {
+static void __fastcall ForceAllOthersObserving(void *gameNetManager, void* self) {
 	void* targets[16];
 	int count = 0;
 
@@ -346,7 +349,7 @@ void __fastcall FUN_00486d80_Wrapper(void* this, int unused, uint8_t param_1, ui
 // ---- 5. CFunc trigger the "Quit Observing" QB menu item calls ----
 // Hijacks the dead-in-retail "DebugRenderIgnore" CFunc slot. Reads the
 // local-player singleton and kicks off the whole request/reply chain.
-int __cdecl CFunc_RequestExitObserverMode(void* param_1) {
+int __cdecl CFunc_RequestExitObserverMode(CStruct *params) {
 	printLog("CFunc_RequestExitObserverMode: enter\n");
 	void* localPlayerSingleton = *(void**)PARTY_ADDR_LOCAL_PLAYER_SINGLETON;
 	printLog("CFunc_RequestExitObserverMode: single read\n");
@@ -356,8 +359,6 @@ int __cdecl CFunc_RequestExitObserverMode(void* param_1) {
 	printLog("CFunc_RequestExitObserverMode: returned from RequestExitObserverMode\n");
 	return 1;
 }
-
-
 
 // Fixes a real vanilla bug: LoadPendingPlayers hardcodes a promoted
 // player's new flags to just JUMPING_IN, silently dropping LOCAL_PLAYER
@@ -395,7 +396,7 @@ static int g_ourPendingPlayersCall = 0;
 // Toggled (not set/cleared separately) by QB, bracketing our own
 // LoadPendingPlayers calls. Hijacks the dead "debugrendermode" CFunc slot
 // (confirmed unused/safe earlier this session).
-int __cdecl CFunc_ToggleOurPendingPlayersFlag(void* param_1) {
+int __cdecl CFunc_ToggleOurPendingPlayersFlag(CStruct *params) {
 	g_ourPendingPlayersCall = !g_ourPendingPlayersCall;
 	return 1;
 }
@@ -424,9 +425,7 @@ static OthersRemainingCount_t OthersRemainingCount = (OthersRemainingCount_t)0x0
 typedef void(__fastcall* FUN_0048be30_t)(void*);
 static FUN_0048be30_t Real_FUN_0048be30 = (FUN_0048be30_t)0x0048be30;
 
-
-
-int __cdecl CFunc_EnterObserverModePending(void* param_1) {
+int __cdecl CFunc_EnterObserverModePending(CStruct* params) {
 	__try {
 		void* gameNetManager = *(void**)PARTY_ADDR_GAMENET_MANAGER;
 		void* self = GetLocalPlayer(gameNetManager);
@@ -467,6 +466,48 @@ void initExitObserverPatches(void) {
 	patchCall((void*)0x00500a26, FUN_004869a0_Wrapper);
 	patchCall((void*)0x0050d7b8, FUN_00486d80_Wrapper);
 	patchCall((void*)0x0050d85b, FUN_00486d80_Wrapper);
+}
+
+typedef int(__cdecl* CFunc_PrintStruct_t)(CStruct *, int);
+static CFunc_PrintStruct_t CFunc_PrintStruct = (CFunc_PrintStruct_t)0x0041a4c0;
+
+int __cdecl CFunc_GetIniBool(CStruct *params) {
+	char *section, *key;
+	CStruct_GetString(params, 0xd28c8510, &section, 0); // "section" (0xd28c8510)
+	CStruct_GetString(params, 0x756f5456, &key, 0); // "key" (0x756f5456)
+
+	return getIniBool(section, key, 0, configFile);
+}
+
+int __cdecl CFunc_GetIniInteger(CStruct *params, CScript *script) {
+	char *section = "";
+	if (!CStruct_GetString(params, 0xd28c8510, &section, 0)) {
+		printLog("GetIniInteger missing param \"section\" (0xd28c8510)\n");
+		return 0;
+	}
+
+	char *key = "";
+	if (!CStruct_GetString(params, 0x756f5456, &key, 0)) {
+		printLog("GetIniInteger missing param \"key\" (0x756f5456)\n");
+		return 0;
+	}
+
+	uint32_t value_name_checksum = 0; // TODO: "value"
+	if (!CStruct_GetChecksum(params, 0xbf4212ef, &value_name_checksum, 0)) {
+		// NOTE: checksum is for lowercase "valuename"; seemingly case insensitive
+		printLog("GetIniInteger missing param \"ValueName\" (0xbf4212ef)\n");
+		return 0;
+	}
+
+	int def = 0;
+	CStruct_GetInteger(params, 0x1ca1ff20, &def, 0); // "default" (0x1ca1ff20)
+
+	int ini_value = GetPrivateProfileInt(section, key, def, configFile);
+
+	CStruct *out = CScript_GetParams(script);
+	CStruct_AddInteger(out, value_name_checksum, ini_value);
+
+	return 1;
 }
 
 // FIXME: still broken, not sure why
@@ -725,7 +766,6 @@ void initPatch() {
 		*(exe + 1) = '\0';
 	}
 
-	char configFile[1024];
 	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
 
 	int isDebug = getIniBool("Miscellaneous", "Debug", 0, configFile);
@@ -782,6 +822,8 @@ void initPatch() {
 	initCFuncs();
 	addCFunc("RequestExitObserverMode", (void *)CFunc_RequestExitObserverMode);
 	addCFunc("ToggleOurPendingPlayersFlag", (void *)CFunc_ToggleOurPendingPlayersFlag);
+	addCFunc("GetIniBool", (void *)CFunc_GetIniBool);
+	addCFunc("GetIniInteger", (void *)CFunc_GetIniInteger);
 	printCFuncs();
 	patchCFuncs();
 
@@ -889,6 +931,27 @@ void patchScriptPrintf() {
 	patchCall(0x0050a3e5, printLog);
 	patchCall(0x0050a4b5, printLog);
 	patchCall(0x0050a4fb, printLog);
+
+	// And for CFuncs::ScriptPrintStruct (0041a4c0)
+	patchCall(0x0041a4ce, printLog);
+	patchCall(0x0041a4e2, printLog);
+	patchCall(0x0041a4f2, printLog);
+	patchCall(0x0041a522, printLog);
+	patchCall(0x0041a540, printLog);
+	patchCall(0x0041a56c, printLog);
+	patchCall(0x0041a595, printLog);
+	patchCall(0x0041a5ab, printLog);
+	patchCall(0x0041a5cf, printLog);
+	patchCall(0x0041a5fa, printLog);
+	patchCall(0x0041a60c, printLog);
+	patchCall(0x0041a62f, printLog);
+	patchCall(0x0041a667, printLog);
+	patchCall(0x0041a685, printLog);
+	patchCall(0x0041a69e, printLog);
+	patchCall(0x0041a6ad, printLog);
+	patchCall(0x0041a6d1, printLog);
+	patchCall(0x0041a6fb, printLog);
+	patchCall(0x0041a70b, printLog);
 }
 
 int isCD() {

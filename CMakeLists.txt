@@ -17,6 +17,7 @@ set(SOURCE_FILES
 	"${SRC}/patches.c"
 	"${SRC}/gfx.c"
 	"${SRC}/gfx_buffers.c"
+	"${SRC}/qb.c"
 )
 
 set(HEADER_FILES
@@ -29,6 +30,7 @@ set(HEADER_FILES
 	"${SRC}/log.h"
 	"${SRC}/script.h"
 	"${SRC}/gfx.h"
+	"${SRC}/qb.h"
 )
 
 list(APPEND INCLUDES ${THIRDPARTY})
