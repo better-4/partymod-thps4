@@ -472,9 +472,17 @@ typedef int(__cdecl* CFunc_PrintStruct_t)(CStruct *, int);
 static CFunc_PrintStruct_t CFunc_PrintStruct = (CFunc_PrintStruct_t)0x0041a4c0;
 
 int __cdecl CFunc_GetIniBool(CStruct *params) {
-	char *section, *key;
-	CStruct_GetString(params, 0xd28c8510, &section, 0); // "section" (0xd28c8510)
-	CStruct_GetString(params, 0x756f5456, &key, 0); // "key" (0x756f5456)
+	char *section = "";
+	if (!CStruct_GetString(params, 0xd28c8510, &section, 0)) {
+		printLog("GetIniBool missing param \"section\" (0xd28c8510)\n");
+		return 0;
+	}
+
+	char *key = "";
+	if (!CStruct_GetString(params, 0x756f5456, &key, 0)) {
+		printLog("GetIniBool missing param \"key\" (0x756f5456)\n");
+		return 0;
+	}
 
 	return getIniBool(section, key, 0, configFile);
 }
@@ -492,7 +500,7 @@ int __cdecl CFunc_GetIniInteger(CStruct *params, CScript *script) {
 		return 0;
 	}
 
-	uint32_t value_name_checksum = 0; // TODO: "value"
+	uint32_t value_name_checksum = 0;
 	if (!CStruct_GetChecksum(params, 0xbf4212ef, &value_name_checksum, 0)) {
 		// NOTE: checksum is for lowercase "valuename"; seemingly case insensitive
 		printLog("GetIniInteger missing param \"ValueName\" (0xbf4212ef)\n");
@@ -506,6 +514,63 @@ int __cdecl CFunc_GetIniInteger(CStruct *params, CScript *script) {
 
 	CStruct *out = CScript_GetParams(script);
 	CStruct_AddInteger(out, value_name_checksum, ini_value);
+
+	return 1;
+}
+
+int __cdecl CFunc_SetIniBool(CStruct *params, CScript *script) {
+	char *section = "";
+	if (!CStruct_GetString(params, 0xd28c8510, &section, 0)) {
+		printLog("SetIniBool missing param \"section\" (0xd28c8510)\n");
+		return 0;
+	}
+
+	char *key = "";
+	if (!CStruct_GetString(params, 0x756f5456, &key, 0)) {
+		printLog("SetIniBool missing param \"key\" (0x756f5456)\n");
+		return 0;
+	}
+
+	float value = 0;
+	if (!CStruct_GetFloat(params, 0xe288a7cb, &value, 0)) {
+		printLog("SetIniBool missing param \"value\" (0xe288a7cb)\n");
+		return 0;
+	}
+
+	char *value_str;
+	if ((int)value) {
+		value_str = "1";
+	} else {
+		value_str = "0";
+	}
+
+	WritePrivateProfileStringA(section, key, value_str, configFile);
+
+	return 1;
+}
+
+int __cdecl CFunc_SetIniInteger(CStruct *params, CScript *script) {
+	char *section = "";
+	if (!CStruct_GetString(params, 0xd28c8510, &section, 0)) {
+		printLog("SetIniInteger missing param \"section\" (0xd28c8510)\n");
+		return 0;
+	}
+
+	char *key = "";
+	if (!CStruct_GetString(params, 0x756f5456, &key, 0)) {
+		printLog("SetIniInteger missing param \"key\" (0x756f5456)\n");
+		return 0;
+	}
+
+	float value = 0;
+	if (!CStruct_GetFloat(params, 0xe288a7cb, &value, 0)) {
+		printLog("SetIniInteger missing param \"value\" (0xe288a7cb)\n");
+		return 0;
+	}
+
+	char value_str[1024];
+	sprintf(value_str, "%d", (int)value);
+	WritePrivateProfileStringA(section, key, &value_str, configFile);
 
 	return 1;
 }
@@ -824,6 +889,8 @@ void initPatch() {
 	addCFunc("ToggleOurPendingPlayersFlag", (void *)CFunc_ToggleOurPendingPlayersFlag);
 	addCFunc("GetIniBool", (void *)CFunc_GetIniBool);
 	addCFunc("GetIniInteger", (void *)CFunc_GetIniInteger);
+	addCFunc("SetIniBool", (void *)CFunc_SetIniBool);
+	addCFunc("SetIniInteger", (void *)CFunc_SetIniInteger);
 	printCFuncs();
 	patchCFuncs();
 

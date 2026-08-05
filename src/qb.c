@@ -46,6 +46,13 @@ int CStruct_GetChecksum(CStruct *this_, uint32_t checksum, uint32_t *ret, int as
     return GetChecksum(this_, UNUSED, checksum, ret, assert);
 }
 
+typedef int(__fastcall* GetFloat_t)(CStruct *this_, unused_t, uint32_t checksum, float *ret, int assert);
+GetFloat_t GetFloat = (GetFloat_t)0x00418100; // Script::CStruct::GetFloat
+
+int CStruct_GetFloat(CStruct *this_, uint32_t checksum, float *ret, int assert) {
+    return GetFloat(this_, UNUSED, checksum, ret, assert);
+}
+
 typedef int(__fastcall* GetInteger_t)(CStruct *this_, unused_t, uint32_t checksum, int *ret, int assert);
 GetInteger_t GetInteger = (GetInteger_t)0x00417ea0; // Script::CStruct::GetInteger
 
