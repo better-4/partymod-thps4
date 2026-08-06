@@ -60,6 +60,7 @@
 //   - Removed serial check that disallowed same cd key players from joining each other with patchSerialCheck();
 // ============================================================================
 
+// XXX (ellie): 0x00ab5b48 is actually Mdl::Skate::Instance
 #define PARTY_ADDR_GAMENET_MANAGER      0x00ab5b48   // the GameNetManager singleton -- represents THIS machine's whole live network session (connections, player list, etc). NOT the same object as the local-player singleton below.
 #define PARTY_ADDR_GET_LOCAL_PLAYER     0x00489ac0
 #define PARTY_FLAG_LOCAL_PLAYER   0x00000001
@@ -68,6 +69,7 @@
 #define PARTY_FLAG_JUMPING_IN     0x00000010
 #define PARTY_FLAG_FULLY_IN       0x00000020
 #define PARTY_PLAYERINFO_FLAGS_OFFSET 0xf8
+// XXX (ellie): 0x00ab5394 is actually GameNet::Manager::Instance
 #define PARTY_ADDR_LOCAL_PLAYER_SINGLETON 0x00ab5394   // separate singleton -- "my own local-player context". What GetLocalPlayer/RequestObserverMode/IsHost/LoadPendingPlayers all actually expect. Mixing this up with PARTY_ADDR_GAMENET_MANAGER was the source of an early, hard-to-find crash (garbage pointer -> IEEE-754 bit pattern for pi).
 #define PARTY_ADDR_IS_HOST 0x0048ead0
 #define PARTY_ADDR_IS_OBSERVING 0x00491560   /* confirmed via JMP-tail trace from IsObserving_cfunc */
