@@ -253,20 +253,6 @@ void loadInputSettings(struct inputsettings *settingsOut) {
 		settingsOut->isPs2Controls = getIniBool("Miscellaneous", "UsePS2Controls", 1, configFile);
 		settingsOut->dropdownEnabled = getIniBool("Miscellaneous", "EnablePCDropdown", 1, configFile);
 		settingsOut->useKeyboardControls = getIniBool("Miscellaneous", "UseKeyboardControls", 1, configFile);
-
-		// 0 = Either (L2 or R2), 1 = L2 only, 2 = R2 only, 3 = Both (L2 and R2)
-		int spineTransferModeVal = GetPrivateProfileInt("Miscellaneous", "SpineTransferButtonMode", SPINE_MODE_EITHER, configFile);
-		if (spineTransferModeVal < SPINE_MODE_EITHER || spineTransferModeVal > SPINE_MODE_L1R1_EITHER) {
-			spineTransferModeVal = SPINE_MODE_EITHER;
-		}
-		settingsOut->spineTransferMode = (spineButtonMode)spineTransferModeVal;
-
-		// 0 = Either (L2 or R2), 1 = L2 only (always drops left), 2 = R2 only (always drops right), 3 = Both (hold L2+R2, always drops right)
-		int dropdownModeVal = GetPrivateProfileInt("Miscellaneous", "DropdownButtonMode", DROPDOWN_MODE_EITHER, configFile);
-		if (dropdownModeVal < DROPDOWN_MODE_EITHER || dropdownModeVal > DROPDOWN_MODE_L1R1_BOTH) {
-			dropdownModeVal = DROPDOWN_MODE_EITHER;
-		}
-		settingsOut->dropdownMode = (dropdownButtonMode)dropdownModeVal;
 	}
 }
 
@@ -324,31 +310,6 @@ void loadControllerBinds(struct controllerbinds *bindsOut) {
 		bindsOut->rightSpin = GetPrivateProfileInt(CONTROLLER_SECTION, "SpinRight", CONTROLLER_BUTTON_RIGHTSHOULDER, configFile);
 		bindsOut->nollie = GetPrivateProfileInt(CONTROLLER_SECTION, "Nollie", CONTROLLER_BUTTON_LEFTTRIGGER, configFile);
 		bindsOut->switchRevert = GetPrivateProfileInt(CONTROLLER_SECTION, "Switch", CONTROLLER_BUTTON_RIGHTTRIGGER, configFile);
-
-		// SpinButtonMode: preset overrides for leftSpin/rightSpin above. 0=L1/R1 (vanilla, no
-		// override), 1=L2/R2, 2=R1/R2 (R1=right, R2=left), 3=L1/L2 (L1=right, L2=left).
-		// L2/R2 modes intentionally double up with Nollie/Switch above (matches other mods).
-		int spinModeVal = GetPrivateProfileInt("Miscellaneous", "SpinButtonMode", SPIN_MODE_L1_R1, configFile);
-		if (spinModeVal < SPIN_MODE_L1_R1 || spinModeVal > SPIN_MODE_L1_L2) {
-			spinModeVal = SPIN_MODE_L1_R1;
-		}
-		switch ((spinButtonMode)spinModeVal) {
-			case SPIN_MODE_L2_R2:
-				bindsOut->leftSpin = CONTROLLER_BUTTON_LEFTTRIGGER;
-				bindsOut->rightSpin = CONTROLLER_BUTTON_RIGHTTRIGGER;
-				break;
-			case SPIN_MODE_R1_R2:
-				bindsOut->rightSpin = CONTROLLER_BUTTON_RIGHTSHOULDER;
-				bindsOut->leftSpin = CONTROLLER_BUTTON_RIGHTTRIGGER;
-				break;
-			case SPIN_MODE_L1_L2:
-				bindsOut->rightSpin = CONTROLLER_BUTTON_LEFTSHOULDER;
-				bindsOut->leftSpin = CONTROLLER_BUTTON_LEFTTRIGGER;
-				break;
-			case SPIN_MODE_L1_R1:
-			default:
-				break;	// leave as loaded from ini above
-		}
 
 		bindsOut->right = GetPrivateProfileInt(CONTROLLER_SECTION, "Right", CONTROLLER_BUTTON_DPAD_RIGHT, configFile);
 		bindsOut->left = GetPrivateProfileInt(CONTROLLER_SECTION, "Left", CONTROLLER_BUTTON_DPAD_LEFT, configFile);

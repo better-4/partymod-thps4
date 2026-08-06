@@ -98,43 +98,6 @@ void registerPatch(char *name, unsigned int sz, char *data) {
 	printLog("Registered patch for %s\n", name);
 }
 
-void registerInputScriptPatches(uint8_t usingPs2Controls, uint8_t dropdownMode) {
-	if (usingPs2Controls) {
-		// dropdownMode: 0=Either (default), 1=L2 only, 2=R2 only, 3=Both (hold L2+R2),
-		// 4=L1/R1 Either, 5=L1 only, 6=R1 only, 7=Both (hold L1+R1)
-		switch (dropdownMode) {
-			case 1:
-				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcL2OnlySize, gGrindScriptsPs2ToPcL2OnlyData);
-				break;
-			case 2:
-				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcR2OnlySize, gGrindScriptsPs2ToPcR2OnlyData);
-				break;
-			case 3:
-				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcBothSize, gGrindScriptsPs2ToPcBothData);
-				break;
-			case 4:
-				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcL1R1EitherSize, gGrindScriptsPs2ToPcL1R1EitherData);
-				break;
-			case 5:
-				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcL1OnlySize, gGrindScriptsPs2ToPcL1OnlyData);
-				break;
-			case 6:
-				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcR1OnlySize, gGrindScriptsPs2ToPcR1OnlyData);
-				break;
-			case 7:
-				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcBothL1R1Size, gGrindScriptsPs2ToPcBothL1R1Data);
-				break;
-			default:
-				registerPatch("scripts\\grindscripts.qb", gGrindScriptsPs2ToPcSize, gGrindScriptsPs2ToPcData);
-				break;
-		}
-	} else {
-		// non-PS2-controls path: GrindRelease is restructured entirely by this older patch,
-		// so dropdown button-combo mode isn't wired up for this path yet - always uses the default.
-		registerPatch("scripts\\grindscripts.qb", gGrindScriptsPCAddDDSize, gGrindScriptsPCAddDDData);
-	}
-}
-
 void initScriptPatches() {
 	scriptMap = map_alloc(16, NULL, NULL);
 

@@ -56,6 +56,7 @@ typedef struct {
 } device;
 
 void patchPs2Buttons();
+void patchSpinKeys();
 
 int controllerCount;
 int controllerListSize;
@@ -1001,11 +1002,9 @@ void __stdcall initManager() {
 	initSDLControllers();
 
 	if (inputsettings.isPs2Controls) {
-		registerInputScriptPatches(1, inputsettings.dropdownMode);
 		patchPs2Buttons();
-	} else if (inputsettings.dropdownEnabled) {
-		registerInputScriptPatches(0, inputsettings.dropdownMode);
-	}
+		patchSpinKeys();
+	} 
 }
 
 uint8_t movieSkipHasBeenPressed = 0;
@@ -1031,25 +1030,30 @@ uint8_t movieKeyboardInput() {
 // used as simple "currently held" flags elsewhere in the game's own code too
 // (including native R2 && L2 checks), so there's nothing hidden to track.
 uint8_t __cdecl checkSpineTransferButtons(void *comp) {
-	uint8_t r2 = *(uint8_t *)((uint8_t *)comp + 0x834);
-	uint8_t l2 = *(uint8_t *)((uint8_t *)comp + 0x87c);
+	uint8_t r2 = *(uint8_t *)((uint8_t *)comp + 0x87c);
+	uint8_t l2 = *(uint8_t *)((uint8_t *)comp + 0x834);
+	char configFile[1024];
+	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
+	int spine_key = GetPrivateProfileInt("In Game Controls", "SpineKey", 0, configFile);
 
-	switch (inputsettings.spineTransferMode) {
-		case SPINE_MODE_L2_ONLY:
-			return l2 != 0;
-		case SPINE_MODE_R2_ONLY:
+	switch (spine_key) 
+	{
+		case 0:
+			return (r2 != 0) || (l2 != 0);
+		case 1:
 			return r2 != 0;
-		case SPINE_MODE_BOTH:
+		case 2:
+			return l2 != 0;
+		case 3:
 			return (r2 != 0) && (l2 != 0);
-		case SPINE_MODE_L1_ONLY:
-			return physicalL1Held != 0;
-		case SPINE_MODE_R1_ONLY:
-			return physicalR1Held != 0;
-		case SPINE_MODE_L1R1_BOTH:
-			return (physicalL1Held != 0) && (physicalR1Held != 0);
-		case SPINE_MODE_L1R1_EITHER:
+		case 4:
 			return (physicalL1Held != 0) || (physicalR1Held != 0);
-		case SPINE_MODE_EITHER:
+		case 5:
+			return physicalR1Held != 0;
+		case 6:
+			return physicalL1Held != 0;
+		case 7:
+			return (physicalL1Held != 0) && (physicalR1Held != 0);
 		default:
 			return (r2 != 0) || (l2 != 0);
 	}
@@ -1106,6 +1110,337 @@ void __stdcall in_air_physics_2(void *comp) {
 void __stdcall lip_side_hop(void *comp) {
 	spine_buttons_asm(0x004d1283, 0x004d12e8);
 }
+
+
+void patchSpinKeysTest()
+{
+	// 0x810 = L1 held
+	// 0x820 = L1 triggered
+	// 0x858 = R1 held
+	// 0x868 = R1 triggered
+	// 0x87C = R2
+	// 0x834 = L2
+	int R2 = 0x7C;
+	int L2 = 0x34;
+	patchByte(0x004b8164 + 2, L2); // L1 held 
+	patchByte(0x004b8253 + 2, L2); // L1 held
+	patchByte(0x004b8319 + 2, L2); // L1 held
+	patchByte(0x004bf582 + 2, L2); // L1 held
+
+	patchByte(0x004b812e + 2, L2); // L1 triggered
+	patchByte(0x004b813e + 2, L2); // L1 triggered
+	patchByte(0x004c01cb + 2, L2); // L1 triggered
+
+	patchByte(0x004b8138 + 2, R2); // R1 held 
+	patchByte(0x004b8261 + 2, R2); // R1 held
+	patchByte(0x004b830b + 2, R2); // R1 held
+	patchByte(0x004bf574 + 2, R2); // R1 held
+
+	patchByte(0x004b815a + 2, R2); // R1 triggered
+	patchByte(0x004b816a + 2, R2); // R1 triggered
+	patchByte(0x004c025b + 2, R2); // R1 triggered
+}
+uint8_t __cdecl checkSpinKeysL1Held(void* comp)
+{
+	uint8_t r2 = *(uint8_t*)((uint8_t*)comp + 0x87c);
+	uint8_t l2 = *(uint8_t*)((uint8_t*)comp + 0x834);
+	uint8_t l1_held = *(uint8_t*)((uint8_t*)comp + 0x810);
+	uint8_t r1_held = *(uint8_t*)((uint8_t*)comp + 0x858);
+
+	char configFile[1024];
+	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
+	int spin_key = GetPrivateProfileInt("In Game Controls", "SpinKey", 0, configFile);
+
+	switch (spin_key)
+	{
+	case 0:
+		return l1_held != 0;
+	case 1:
+		return l2 != 0;
+	case 2:
+		return r1_held != 0;
+	case 3:
+		return l1_held != 0;
+	default:
+		return l1_held != 0;
+	}
+
+}
+uint8_t __cdecl checkSpinKeysL1Trigger(void* comp) {
+	uint8_t r2 = *(uint8_t*)((uint8_t*)comp + 0x87c);
+	uint8_t l2 = *(uint8_t*)((uint8_t*)comp + 0x834);
+	uint8_t l1_trigger = *(uint8_t*)((uint8_t*)comp + 0x820);
+	uint8_t r1_trigger = *(uint8_t*)((uint8_t*)comp + 0x858);
+
+	char configFile[1024];
+	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
+	int spin_key = GetPrivateProfileInt("In Game Controls", "SpinKey", 0, configFile);
+
+	switch (spin_key)
+	{
+	case 0:
+		return l1_trigger != 0;
+	case 1:
+		return l2 != 0;
+	case 2:
+		return r1_trigger != 0;
+	case 3:
+		return l1_trigger != 0;
+	default:
+		return l1_trigger != 0;
+	}
+
+}
+uint8_t __cdecl checkSpinKeysR1Held(void* comp) {
+	uint8_t r2 = *(uint8_t*)((uint8_t*)comp + 0x87c);
+	uint8_t l2 = *(uint8_t*)((uint8_t*)comp + 0x834);
+	uint8_t l1_held = *(uint8_t*)((uint8_t*)comp + 0x810);
+	uint8_t r1_held = *(uint8_t*)((uint8_t*)comp + 0x858);
+
+	char configFile[1024];
+	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
+	int spin_key = GetPrivateProfileInt("In Game Controls", "SpinKey", 0, configFile);
+
+	switch (spin_key)
+	{
+	case 0:
+		return r1_held != 0;
+	case 1:
+		return r2 != 0;
+	case 2:
+		return r2 != 0;
+	case 3:
+		return l2 != 0;
+	default:
+		return r1_held != 0;
+	}
+
+}uint8_t __cdecl checkSpinKeysR1Trigger(void* comp) {
+	uint8_t r2 = *(uint8_t*)((uint8_t*)comp + 0x87c);
+	uint8_t l2 = *(uint8_t*)((uint8_t*)comp + 0x834);
+	uint8_t l1_trigger = *(uint8_t*)((uint8_t*)comp + 0x820);
+	uint8_t r1_trigger = *(uint8_t*)((uint8_t*)comp + 0x858);
+
+	char configFile[1024];
+	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
+	int spin_key = GetPrivateProfileInt("In Game Controls", "SpinKey", 0, configFile);
+
+	switch (spin_key)
+	{
+	case 0:
+		return r1_trigger != 0;
+	case 1:
+		return r2 != 0;
+	case 2:
+		return r2 != 0;
+	case 3:
+		return l2 != 0;
+	default:
+		return r1_trigger != 0;
+	}
+
+}
+
+
+
+#define spin_keys_l1_held_asm(SUCCESS, FAIL) __asm {	\
+	__asm push eax	\
+	__asm push ebx	\
+	__asm push comp	\
+	__asm call checkSpinKeysL1Held	\
+	__asm add esp, 4	\
+	__asm test al, al	\
+	__asm jne success	\
+	\
+__asm failure:	\
+	__asm pop ebx	\
+	__asm pop eax	\
+	__asm mov esp, ebp	\
+	__asm pop ebp	\
+	__asm push FAIL	\
+	__asm ret 0x08	\
+	\
+__asm success:	\
+	__asm pop ebx	\
+	__asm pop eax	\
+	__asm mov esp, ebp	\
+	__asm pop ebp	\
+	__asm push SUCCESS	\
+	__asm ret 0x08	\
+}
+
+#define spin_keys_l1_trigger_asm(SUCCESS, FAIL) __asm {	\
+	__asm push eax	\
+	__asm push ebx	\
+	__asm push comp	\
+	__asm call checkSpinKeysL1Trigger	\
+	__asm add esp, 4	\
+	__asm test al, al	\
+	__asm jne success	\
+	\
+__asm failure:	\
+	__asm pop ebx	\
+	__asm pop eax	\
+	__asm mov esp, ebp	\
+	__asm pop ebp	\
+	__asm push FAIL	\
+	__asm ret 0x08	\
+	\
+__asm success:	\
+	__asm pop ebx	\
+	__asm pop eax	\
+	__asm mov esp, ebp	\
+	__asm pop ebp	\
+	__asm push SUCCESS	\
+	__asm ret 0x08	\
+}
+#define spin_keys_r1_held_asm(SUCCESS, FAIL) __asm {	\
+	__asm push eax	\
+	__asm push ebx	\
+	__asm push comp	\
+	__asm call checkSpinKeysR1Held	\
+	__asm add esp, 4	\
+	__asm test al, al	\
+	__asm jne success	\
+	\
+__asm failure:	\
+	__asm pop ebx	\
+	__asm pop eax	\
+	__asm mov esp, ebp	\
+	__asm pop ebp	\
+	__asm push FAIL	\
+	__asm ret 0x08	\
+	\
+__asm success:	\
+	__asm pop ebx	\
+	__asm pop eax	\
+	__asm mov esp, ebp	\
+	__asm pop ebp	\
+	__asm push SUCCESS	\
+	__asm ret 0x08	\
+}
+
+#define spin_keys_r1_trigger_asm(SUCCESS, FAIL) __asm {	\
+	__asm push eax	\
+	__asm push ebx	\
+	__asm push comp	\
+	__asm call checkSpinKeysR1Trigger	\
+	__asm add esp, 4	\
+	__asm test al, al	\
+	__asm jne success	\
+	\
+__asm failure:	\
+	__asm pop ebx	\
+	__asm pop eax	\
+	__asm mov esp, ebp	\
+	__asm pop ebp	\
+	__asm push FAIL	\
+	__asm ret 0x08	\
+	\
+__asm success:	\
+	__asm pop ebx	\
+	__asm pop eax	\
+	__asm mov esp, ebp	\
+	__asm pop ebp	\
+	__asm push SUCCESS	\
+	__asm ret 0x08	\
+}
+
+
+
+void __stdcall l1_held_check1(void* comp) {
+	spin_keys_l1_held_asm(0x004b816a, 0x004b816a);
+}
+void __stdcall l1_held_check2(void* comp) {
+	spin_keys_l1_held_asm(0x004b8261, 0x004b830b);
+}
+void __stdcall l1_held_check3(void* comp) {
+	spin_keys_l1_held_asm(0x004b83c9, 0x004b8327);
+}
+void __stdcall l1_held_check4(void* comp) {
+	spin_keys_l1_held_asm(0x004c0c5c, 0x004c0c6d);
+}
+void __stdcall l1_trigger_check1(void* comp) {
+	spin_keys_l1_trigger_asm(0x004b8138, 0x004b815a);
+}
+void __stdcall l1_trigger_check2(void* comp) {
+	spin_keys_l1_trigger_asm(0x004b815a, 0x004b8148);
+}
+void __stdcall l1_trigger_check3(void* comp) {
+	spin_keys_l1_trigger_asm(0x004c01d9, 0x004c025b);
+}
+
+void __stdcall r1_held_check1(void* comp) {
+	spin_keys_r1_held_asm(0x004b813e, 0x004b813e);
+}
+void __stdcall r1_held_check2(void* comp) {
+	spin_keys_r1_held_asm(0x004b8319, 0x004b826f);
+}
+void __stdcall r1_held_check3(void* comp) {
+	spin_keys_r1_held_asm(0x004b8319, 0x004b83c9);
+}
+void __stdcall r1_held_check4(void* comp) {
+	spin_keys_r1_held_asm(0x004bf80c, 0x004bf582);
+}
+void __stdcall r1_trigger_check1(void* comp) {
+	spin_keys_r1_trigger_asm(0x004b8164, 0x004b8187);
+}
+void __stdcall r1_trigger_check2(void* comp) {
+	spin_keys_r1_trigger_asm(0x004b8187, 0x004b8175);
+}
+void __stdcall r1_trigger_check3(void* comp) {
+	spin_keys_r1_trigger_asm(0x004c0269, 0x004c02ea);
+}
+
+
+
+void patchSpinKeys() {
+	patchByte((void*)(0x004b8164), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004b8164 + 1), l1_held_check1);
+
+	patchByte((void*)(0x004b8253), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004b8253 + 1), l1_held_check2);
+
+	patchByte((void*)(0x004b8319), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004b8319 + 1), l1_held_check3);
+
+	patchByte((void*)(0x004c0c52), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004c0c52 + 1), l1_held_check4);
+
+	patchByte((void*)(0x004b812e), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004b812e + 1), l1_trigger_check1);
+
+	patchByte((void*)(0x004b813e), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004b813e + 1), l1_trigger_check2);
+
+	patchByte((void*)(0x004c01cb), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004c01cb + 1), l1_trigger_check3);
+
+
+	patchByte((void*)(0x004b8138), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004b8138 + 1), r1_held_check1);
+
+	patchByte((void*)(0x004b8261), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004b8261 + 1), r1_held_check2);
+
+	patchByte((void*)(0x004b830b), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004b830b + 1), r1_held_check3);
+
+	patchByte((void*)(0x004bf574), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004bf574 + 1), r1_held_check4);
+
+	patchByte((void*)(0x004b815a), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004b815a + 1), r1_trigger_check1);
+
+	patchByte((void*)(0x004b816a), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004b816a + 1), r1_trigger_check2);
+
+	patchByte((void*)(0x004c025b), 0x56);	// PUSH ESI
+	patchCall((void*)(0x004c025b + 1), r1_trigger_check3);
+
+
+}
+
 
 void patchPs2Buttons() {
 	// ps2 controls - fix spine buttons
