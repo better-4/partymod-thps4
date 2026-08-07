@@ -1029,10 +1029,10 @@ uint8_t movieKeyboardInput() {
 // no held-across-frames state needed: the decomp confirms these two bytes are
 // used as simple "currently held" flags elsewhere in the game's own code too
 // (including native R2 && L2 checks), so there's nothing hidden to track.
+char configFile[1024];
 uint8_t __cdecl checkSpineTransferButtons(void *comp) {
 	uint8_t r2 = *(uint8_t *)((uint8_t *)comp + 0x87c);
 	uint8_t l2 = *(uint8_t *)((uint8_t *)comp + 0x834);
-	char configFile[1024];
 	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
 	int spine_key = GetPrivateProfileInt("In Game Controls", "SpineKey", 0, configFile);
 
@@ -1147,7 +1147,6 @@ uint8_t __cdecl checkSpinKeysL1Held(void* comp)
 	uint8_t l1_held = *(uint8_t*)((uint8_t*)comp + 0x810);
 	uint8_t r1_held = *(uint8_t*)((uint8_t*)comp + 0x858);
 
-	char configFile[1024];
 	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
 	int spin_key = GetPrivateProfileInt("In Game Controls", "SpinKey", 0, configFile);
 
@@ -1172,7 +1171,6 @@ uint8_t __cdecl checkSpinKeysL1Trigger(void* comp) {
 	uint8_t l1_trigger = *(uint8_t*)((uint8_t*)comp + 0x820);
 	uint8_t r1_trigger = *(uint8_t*)((uint8_t*)comp + 0x858);
 
-	char configFile[1024];
 	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
 	int spin_key = GetPrivateProfileInt("In Game Controls", "SpinKey", 0, configFile);
 
@@ -1197,7 +1195,6 @@ uint8_t __cdecl checkSpinKeysR1Held(void* comp) {
 	uint8_t l1_held = *(uint8_t*)((uint8_t*)comp + 0x810);
 	uint8_t r1_held = *(uint8_t*)((uint8_t*)comp + 0x858);
 
-	char configFile[1024];
 	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
 	int spin_key = GetPrivateProfileInt("In Game Controls", "SpinKey", 0, configFile);
 
@@ -1221,7 +1218,6 @@ uint8_t __cdecl checkSpinKeysR1Held(void* comp) {
 	uint8_t l1_trigger = *(uint8_t*)((uint8_t*)comp + 0x820);
 	uint8_t r1_trigger = *(uint8_t*)((uint8_t*)comp + 0x858);
 
-	char configFile[1024];
 	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
 	int spin_key = GetPrivateProfileInt("In Game Controls", "SpinKey", 0, configFile);
 
