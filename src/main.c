@@ -507,10 +507,11 @@ int __cdecl CFunc_GetIniInteger(CStruct *params, CScript *script) {
 		return 0;
 	}
 
-	int def = 0;
-	CStruct_GetInteger(params, 0x1ca1ff20, &def, 0); // "default" (0x1ca1ff20)
-
+	float def_f = 0;
+	CStruct_GetFloat(params, 0xcee685bd, &def_f, 0); // "fallback" (0xcee685bd) 
+	int def = (int)def_f;
 	int ini_value = GetPrivateProfileInt(section, key, def, configFile);
+
 
 	CStruct *out = CScript_GetParams(script);
 	CStruct_AddInteger(out, value_name_checksum, ini_value);
