@@ -74,7 +74,7 @@ void CStruct_RemoveComponent(CStruct *this_, uint32_t checksum) {
     RemoveComponent(this_, UNUSED, checksum);
 }
 
-CStruct *__cdecl CScript_GetParams(CScript *this_) {
+CStruct *CScript_GetParams(CScript *this_) {
     // inlined during compilation; access member directly
     return *(CStruct **)(((char *)this_) + 0x14);
 }
