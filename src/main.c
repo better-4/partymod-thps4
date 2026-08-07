@@ -15,6 +15,7 @@
 #include <patch.h>
 #include <script.h>
 #include <qb.h>
+#include <gslist/gslist.h>
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0
@@ -614,6 +615,12 @@ int __cdecl CFunc_ChangeGlobal(CStruct *params, CScript *script) {
 	return 1;
 }
 
+int __cdecl CFunc_GetServerList(CStruct *params, CScript *script) {
+	printLog("hellooooo :3");
+	gslist_main(6, (int[]){"-n", "thps4pc", "-x", "master.openspy.net", "-X", "\\hostname\\gamever\\gametype\\gamemode\\mapname\\numplayers"});
+	return 1;
+}
+
 // FIXME: still broken, not sure why
 double ledgeWarpFix(double n) {
 	//printf("DOING LEDGE WARP FIX\n");
@@ -933,6 +940,7 @@ void initPatch() {
 	addCFunc("ChangeGlobal", (void *)CFunc_ChangeGlobal);
 	addCFunc("SetSpinKeysControl", (void *)CFunc_SetSpinKeysControl);
 	addCFunc("SetSpineTransferControl", (void *)CFunc_SetSpineTransferControl);
+	addCFunc("GetServerList", (void *)CFunc_GetServerList);
 	if (isDebug) {
 	    printCFuncs();
 	}
