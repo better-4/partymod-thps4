@@ -471,6 +471,9 @@ void initExitObserverPatches(void) {
 typedef int(__cdecl* CFunc_PrintStruct_t)(CStruct *, int);
 static CFunc_PrintStruct_t CFunc_PrintStruct = (CFunc_PrintStruct_t)0x0041a4c0;
 
+typedef int(__cdecl* CFunc_Change_t)(CStruct *);
+static CFunc_Change_t CFunc_Change = (CFunc_Change_t)0x0050f630;
+
 int __cdecl CFunc_GetIniBool(CStruct *params) {
 	char *section = "";
 	if (!CStruct_GetString(params, 0xd28c8510, &section, 0)) {
@@ -508,10 +511,9 @@ int __cdecl CFunc_GetIniInteger(CStruct *params, CScript *script) {
 	}
 
 	float def_f = 0;
-	CStruct_GetFloat(params, 0xcee685bd, &def_f, 0); // "fallback" (0xcee685bd) 
+	CStruct_GetFloat(params, 0xcee685bd, &def_f, 0); // "fallback" (0xcee685bd)
 	int def = (int)def_f;
 	int ini_value = GetPrivateProfileInt(section, key, def, configFile);
-
 
 	CStruct *out = CScript_GetParams(script);
 	CStruct_AddInteger(out, value_name_checksum, ini_value);
@@ -572,6 +574,40 @@ int __cdecl CFunc_SetIniInteger(CStruct *params, CScript *script) {
 	char value_str[1024];
 	sprintf(value_str, "%d", (int)value);
 	WritePrivateProfileStringA(section, key, &value_str, configFile);
+
+	return 1;
+}
+
+// allows you to
+// ```cscript
+// ChangeGlobal name = <name> value = <value>
+// ```
+// since you can't
+// ```cscript
+// Change <name> = <value>
+// ```
+int __cdecl CFunc_ChangeGlobal(CStruct *params, CScript *script) {
+	uint32_t name = 0;
+	if (!CStruct_GetChecksum(params, 0xa1dc81f9, &name, 0)) {
+		printLog("ChangeGlobal missing param \"name\" (0xa1dc81f9)\n");
+		return 0;
+	}
+	CStruct_RemoveComponent(params, 0xa1dc81f9);
+
+	float float_value = 0;
+	uint32_t checksum_value = 0;
+	if (CStruct_GetFloat(params, 0xe288a7cb, &float_value, 0)) {
+		CStruct_RemoveComponent(params, 0xe288a7cb);
+		CStruct_AddFloat(params, name, float_value);
+	} else if (CStruct_GetChecksum(params, 0xe288a7cb, &checksum_value, 0)) {
+		CStruct_RemoveComponent(params, 0xe288a7cb);
+		CStruct_AddChecksum(params, name, checksum_value);
+	} else {
+		printLog("ChangeGlobal missing param \"value\" (0xe288a7cb)\n");
+		return 0;
+	}
+
+	CFunc_Change(params);
 
 	return 1;
 }
@@ -892,7 +928,12 @@ void initPatch() {
 	addCFunc("GetIniInteger", (void *)CFunc_GetIniInteger);
 	addCFunc("SetIniBool", (void *)CFunc_SetIniBool);
 	addCFunc("SetIniInteger", (void *)CFunc_SetIniInteger);
-	printCFuncs();
+	addCFunc("ChangeGlobal", (void *)CFunc_ChangeGlobal);
+	addCFunc("SetSpinKeysControl", (void *)CFunc_SetSpinKeysControl);
+	addCFunc("SetSpineTransferControl", (void *)CFunc_SetSpineTransferControl);
+	if (isDebug) {
+	    printCFuncs();
+	}
 	patchCFuncs();
 
 	printLog("Patch Initialized\n");

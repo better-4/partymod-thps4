@@ -25,6 +25,20 @@ typedef uint32_t unused_t;
 
 // Any `assert` arguments should be passed 0; we don't patch the debug print functions they call.
 
+typedef void(__fastcall* AddChecksum_t)(CStruct *this_, unused_t, uint32_t checksum, uint32_t value);
+AddChecksum_t AddChecksum = (AddChecksum_t)0x00416a00; // Script::CStruct::AddChecksum
+
+void CStruct_AddChecksum(CStruct *this_, uint32_t checksum, uint32_t value) {
+    AddChecksum(this_, UNUSED, checksum, value);
+}
+
+typedef void(__fastcall* AddFloat_t)(CStruct *this_, unused_t, uint32_t checksum, float value);
+AddFloat_t AddFloat = (AddFloat_t)0x00416830; // Script::CStruct::AddFloat
+
+void CStruct_AddFloat(CStruct *this_, uint32_t checksum, float value) {
+    AddFloat(this_, UNUSED, checksum, value);
+}
+
 typedef void(__fastcall* AddInteger_t)(CStruct *this_, unused_t, uint32_t checksum, int value);
 AddInteger_t AddInteger = (AddInteger_t)0x00416660; // Script::CStruct::AddInteger
 
@@ -74,7 +88,8 @@ void CStruct_RemoveComponent(CStruct *this_, uint32_t checksum) {
     RemoveComponent(this_, UNUSED, checksum);
 }
 
-CStruct *__cdecl CScript_GetParams(CScript *this_) {
+CStruct *CScript_GetParams(CScript *this_) {
     // inlined during compilation; access member directly
     return *(CStruct **)(((char *)this_) + 0x14);
 }
+

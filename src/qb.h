@@ -6,6 +6,7 @@
 typedef void CStruct;
 typedef void CScript;
 
+void CStruct_AddFloat(CStruct *this_, uint32_t checksum, float value);
 void CStruct_AddInteger(CStruct *this_, uint32_t checksum, int value);
 void CStruct_AddString(CStruct *this_, uint32_t checksum, char *value);
 int CStruct_GetChecksum(CStruct *this_, uint32_t checksum, uint32_t *ret, int assert);

@@ -14,7 +14,6 @@ set(SOURCE_FILES
 	"${SRC}/hash.c"
 	"${SRC}/log.c"
 	"${SRC}/script.c"
-	"${SRC}/patches.c"
 	"${SRC}/gfx.c"
 	"${SRC}/gfx_buffers.c"
 	"${SRC}/qb.c"

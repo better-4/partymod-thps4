@@ -10,6 +10,7 @@
 #include <log.h>
 #include <patch.h>
 #include <script.h>
+#include <qb.h>
 
 // device is +0x100
 typedef struct {
@@ -54,6 +55,7 @@ typedef struct {
 	uint32_t start_or_a_pressed;
 	// 238
 } device;
+
 
 void patchPs2Buttons();
 void patchSpinKeys();
@@ -1024,22 +1026,14 @@ uint8_t movieKeyboardInput() {
 	return 1;
 }
 
-// reads R2 (comp+0x834) and L2 (comp+0x87c) off the game's native skater control
-// struct and applies whichever combo mode is configured. plain per-frame reads,
-// no held-across-frames state needed: the decomp confirms these two bytes are
-// used as simple "currently held" flags elsewhere in the game's own code too
-// (including native R2 && L2 checks), so there's nothing hidden to track.
-char configFile[1024];
+int spine_transfer_control_index = 0;
+
 uint8_t __cdecl checkSpineTransferButtons(void *comp) {
 	uint8_t r2 = *(uint8_t *)((uint8_t *)comp + 0x87c);
 	uint8_t l2 = *(uint8_t *)((uint8_t *)comp + 0x834);
-	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
-	int spine_key = GetPrivateProfileInt("In Game Controls", "SpineKey", 0, configFile);
 
-	switch (spine_key) 
+	switch (spine_transfer_control_index)
 	{
-		case 0:
-			return (r2 != 0) || (l2 != 0);
 		case 1:
 			return r2 != 0;
 		case 2:
@@ -1054,6 +1048,7 @@ uint8_t __cdecl checkSpineTransferButtons(void *comp) {
 			return physicalL1Held != 0;
 		case 7:
 			return (physicalL1Held != 0) && (physicalR1Held != 0);
+		case 0:
 		default:
 			return (r2 != 0) || (l2 != 0);
 	}
@@ -1111,7 +1106,6 @@ void __stdcall lip_side_hop(void *comp) {
 	spine_buttons_asm(0x004d1283, 0x004d12e8);
 }
 
-
 void patchSpinKeysTest()
 {
 	// 0x810 = L1 held
@@ -1140,6 +1134,9 @@ void patchSpinKeysTest()
 	patchByte(0x004b816a + 2, R2); // R1 triggered
 	patchByte(0x004c025b + 2, R2); // R1 triggered
 }
+
+int spin_keys_control_index = 0;
+
 uint8_t __cdecl checkSpinKeysL1Held(void* comp)
 {
 	uint8_t r2 = *(uint8_t*)((uint8_t*)comp + 0x87c);
@@ -1147,97 +1144,80 @@ uint8_t __cdecl checkSpinKeysL1Held(void* comp)
 	uint8_t l1_held = *(uint8_t*)((uint8_t*)comp + 0x810);
 	uint8_t r1_held = *(uint8_t*)((uint8_t*)comp + 0x858);
 
-	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
-	int spin_key = GetPrivateProfileInt("In Game Controls", "SpinKey", 0, configFile);
-
-	switch (spin_key)
+	switch (spin_keys_control_index)
 	{
-	case 0:
-		return l1_held != 0;
 	case 1:
 		return l2 != 0;
 	case 2:
 		return r1_held != 0;
 	case 3:
 		return l1_held != 0;
+	case 0:
 	default:
 		return l1_held != 0;
 	}
-
 }
+
 uint8_t __cdecl checkSpinKeysL1Trigger(void* comp) {
 	uint8_t r2 = *(uint8_t*)((uint8_t*)comp + 0x87c);
 	uint8_t l2 = *(uint8_t*)((uint8_t*)comp + 0x834);
 	uint8_t l1_trigger = *(uint8_t*)((uint8_t*)comp + 0x820);
 	uint8_t r1_trigger = *(uint8_t*)((uint8_t*)comp + 0x858);
 
-	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
-	int spin_key = GetPrivateProfileInt("In Game Controls", "SpinKey", 0, configFile);
-
-	switch (spin_key)
+	switch (spin_keys_control_index)
 	{
-	case 0:
-		return l1_trigger != 0;
 	case 1:
 		return l2 != 0;
 	case 2:
 		return r1_trigger != 0;
 	case 3:
 		return l1_trigger != 0;
+	case 0:
 	default:
 		return l1_trigger != 0;
 	}
-
 }
+
 uint8_t __cdecl checkSpinKeysR1Held(void* comp) {
 	uint8_t r2 = *(uint8_t*)((uint8_t*)comp + 0x87c);
 	uint8_t l2 = *(uint8_t*)((uint8_t*)comp + 0x834);
 	uint8_t l1_held = *(uint8_t*)((uint8_t*)comp + 0x810);
 	uint8_t r1_held = *(uint8_t*)((uint8_t*)comp + 0x858);
 
-	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
-	int spin_key = GetPrivateProfileInt("In Game Controls", "SpinKey", 0, configFile);
-
-	switch (spin_key)
+	switch (spin_keys_control_index)
 	{
-	case 0:
-		return r1_held != 0;
 	case 1:
 		return r2 != 0;
 	case 2:
 		return r2 != 0;
 	case 3:
 		return l2 != 0;
+	case 0:
 	default:
 		return r1_held != 0;
 	}
 
-}uint8_t __cdecl checkSpinKeysR1Trigger(void* comp) {
+}
+
+uint8_t __cdecl checkSpinKeysR1Trigger(void* comp) {
 	uint8_t r2 = *(uint8_t*)((uint8_t*)comp + 0x87c);
 	uint8_t l2 = *(uint8_t*)((uint8_t*)comp + 0x834);
 	uint8_t l1_trigger = *(uint8_t*)((uint8_t*)comp + 0x820);
 	uint8_t r1_trigger = *(uint8_t*)((uint8_t*)comp + 0x858);
 
-	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
-	int spin_key = GetPrivateProfileInt("In Game Controls", "SpinKey", 0, configFile);
-
-	switch (spin_key)
+	switch (spin_keys_control_index)
 	{
-	case 0:
-		return r1_trigger != 0;
 	case 1:
 		return r2 != 0;
 	case 2:
 		return r2 != 0;
 	case 3:
 		return l2 != 0;
+	case 0:
 	default:
 		return r1_trigger != 0;
 	}
-
 }
-
-
 
 #define spin_keys_l1_held_asm(SUCCESS, FAIL) __asm {	\
 	__asm push eax	\
@@ -1388,8 +1368,6 @@ void __stdcall r1_trigger_check3(void* comp) {
 	spin_keys_r1_trigger_asm(0x004c0269, 0x004c02ea);
 }
 
-
-
 void patchSpinKeys() {
 	patchByte((void*)(0x004b8164), 0x56);	// PUSH ESI
 	patchCall((void*)(0x004b8164 + 1), l1_held_check1);
@@ -1491,4 +1469,26 @@ void patchInput() {
 
 	patchCall(0x00541fe0, activate_actuators);
 	patchByte(0x00541fe0, 0xe9);	// patch CALL to JMP
+}
+
+int __cdecl CFunc_SetSpineTransferControl(CStruct *params) {
+	float index;
+	if (!CStruct_GetFloat(params, 0x7f8c98fe, &index, 0)) {
+		printLog("SetSpineTransferControl missing param \"index\" (0x7f8c98fe)\n");
+		return 0;
+	}
+
+	spine_transfer_control_index = (int)index;
+	printLog("Set spine_transfer_control_index=%d\n", spine_transfer_control_index);
+}
+
+int __cdecl CFunc_SetSpinKeysControl(CStruct *params) {
+	float index;
+	if (!CStruct_GetFloat(params, 0x7f8c98fe, &index, 0)) {
+		printLog("SetSpinKeysControl missing param \"index\" (0x7f8c98fe)\n");
+		return 0;
+	}
+	
+	spin_keys_control_index = (int)index;
+	printLog("Set spin_keys_control_index=%d\n", spin_keys_control_index);
 }
