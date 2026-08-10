@@ -149,10 +149,6 @@ static const u8         MSGAMEKEYX[]    = "Xn221z";
 #define KNOWNCFG        "knownsvc.cfg"
 #define GSHKEYSCFG      "gshkeys.txt"
 #define DETECTCFG       "detection.cfg"
-#define GEOIPDAT        "GeoIP.dat"
-#define GEOIPHOST       "geolite.maxmind.com"
-#define GEOIPURI        "/download/geoip/database/GeoLiteCountry/GeoIP.dat.gz"
-#define GEOIPUPDTIME    648000  // 7 days
 #define OLDGSINFO       "\\status\\"
 #define ENCTYPEX_QUERY_GSLIST   "\\hostname\\mapname\\gametype\\gamemode\\numplayers\\maxplayers\\gamever\\password\\sv_punkbuster\\pb\\punkbuster\\hostport\\ranked\\dedicated\\timelimit\\fraglimit\\gamevariant"
 #define MAXNAMESREQ     60
@@ -346,7 +342,7 @@ int     megaquery       = -1,
         no_reping       = 0,
         ignore_errors   = 0,
         sql             = 0,
-        quiet           = 0,
+        quiet           = 1,
         myenctype       = -1,   // 0, 1 and 2 or -1 for the X type
         force_natneg    = 0,
         enctypex_type   = 1,
@@ -364,7 +360,7 @@ u8      *mshost         = (u8 *)MS,         // do N OT touch
         *sql_query      = NULL,
         *sql_queryb     = NULL,
         *sql_queryl     = NULL,
-        *enctypex_query = "",
+        *enctypex_query = NULL,
         *multi_query_custom_binary = NULL;
 
 
@@ -381,13 +377,12 @@ u8      *mshost         = (u8 *)MS,         // do N OT touch
 #include "gsshow.h"             // help, output, format and so on
 #include "multi_query.h"        // scanning and queries
 
-
-int gslist_main(int argc, char *argv[]) {
+int gslist(char *gamestr, char *query, char servers[128][1024], uint32_t *num_servers) {
+    enctypex_query = query;
     enctypex_data_t enctypex_data;
     struct  sockaddr_in peer;
     ipport_t    *ipport,
                 *ipbuffer;
-    u32     servers;
     int     sd,
             len,
             i,
@@ -399,7 +394,6 @@ int gslist_main(int argc, char *argv[]) {
             mini_query_type  = 0;
     u16     heartbeat_port   = 0;
     u8      *buff            = NULL,
-            *gamestr         = NULL,
             validate[VALIDATESZ + 1],
             secure[SECURESZ + 1],
             outtype          = 0,
@@ -427,332 +421,10 @@ int gslist_main(int argc, char *argv[]) {
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
 
-    fprintf(stderr, GSTITLE);
+    if(!quiet) fprintf(stderr, GSTITLE);
 
     fdout = stdout;
     *gslist_path = 0;
-
-#ifdef WINTRAY
-#else
-    if(argc < 2) {
-        show_help();
-        exit(1);
-    }
-#endif
-
-    for(i = 1; i < argc; i++) {
-        if(stristr(argv[i], "--help")) {
-            show_help();
-            return(0);
-        }
-        if(((argv[i][0] != '-') && (argv[i][0] != '/')) || (strlen(argv[i]) != 2)) {
-            fprintf(stderr, "\n"
-                "Error: recheck your options (%s is not valid)\n"
-                "\n", argv[i]);
-            exit(1);
-        }
-
-        switch(argv[i][1]) {
-            case '-':
-            case '/':
-            case '?':
-            case 'h': {
-                show_help();
-                return(0);
-                break;
-            }
-            case 'n':
-            case 'N': {
-                i++;
-                if(!argv[i]) {
-                    fprintf(stderr, "\n"
-                        "Error: you must select a gamename\n"
-                        "Use -l for the full list or -s for searching a specific game\n"
-                        "\n");
-                    exit(1);
-                }
-                gamestr = argv[i];
-                break;
-            }
-            case 'i': {
-                i++;
-                CHECKARG
-                mini_query_type = 0;
-                mini_query_host = argv[i];
-                if(argv[i + 1] && (argv[i + 1][0] != '-')) mini_query_port = argv[++i];
-                break;
-            }
-            case 'I': {
-                i++;
-                CHECKARG
-                mini_query_type = 8;
-                mini_query_host = argv[i];
-                if(argv[i + 1] && (argv[i + 1][0] != '-')) mini_query_port = argv[++i];
-                break;
-            }
-            case 'd': {
-                i++;
-                if(ARGHELP1) {
-                    fprintf(stderr, "- list of supported game queries and their number:\n");
-                    i = 0;
-                    while(switch_type_query(i, NULL, NULL, NULL, 2)) {
-                        if(!(++i % 3)) fputc('\n', stderr);
-                    }
-                    fprintf(stderr, "\n    or a C string containing the custom packet to send like: -d \"hel\\x6c\\x6f\"\n");
-                    return(0);
-                }
-                //mini_query_type = atoi(argv[i]);
-                set_custom_multi_query(mini_query_type)
-                mini_query_host = argv[++i];
-                if(argv[i + 1] && (argv[i + 1][0] != '-')) mini_query_port = argv[++i];
-                break;
-            }
-            case 'f': {
-                i++;
-                if(ARGHELP) {
-                    show_filter_help();
-                    return(0);
-                }
-                filter = argv[i];
-                break;
-            }
-            case 'r': {
-                i++;
-                CHECKARG
-
-                execstring = argv[i];
-                execlen = strlen(execstring) + 23;
-
-                tmpexec = malloc(execlen);
-                if(!tmpexec) std_err();
-
-                execstring_ip = strstr(execstring, "#IP");
-                execstring_port = strstr(execstring, "#PORT");
-                if(execstring_ip) *execstring_ip = 0;
-                if(execstring_port) *execstring_port = 0;
-
-                execlen = strlen(execstring);
-                memcpy(tmpexec, execstring, execlen);
-                break;
-            }
-            case 'o': {
-                i++;
-                if(ARGHELP) {
-                    show_output_help();
-                    return(0);
-                }
-                outtype = atoi(argv[i]);
-                if(outtype > 6) outtype = 0;
-                if(!outtype) {
-                    fdout = fopen(argv[i], "wb");
-                    if(!fdout) std_err();
-                }
-                break;
-            }
-            case 'q': {
-                quiet = 1;
-                break;
-            }
-            case 'x': {
-                i++;
-                if(!argv[i]) {
-                    fprintf(stderr, "\n"
-                        "Error: you must specify the master server and optionally its port\n"
-                        "\n");
-                    exit(1);
-                }
-                msport = MSXPORT;
-                mshost = strchr(argv[i], ':');
-                if(mshost) {
-                    msport = atoi(mshost + 1);
-                    *mshost = 0;
-                }
-                mshost = argv[i];
-                mymshost = mshost;
-                break;
-            }
-            case 'b': {
-                i++;
-                CHECKARG
-                msport = HBPORT;
-                heartbeat_port = atoi(argv[i]);
-                hbmethod = 1;
-                break;
-            }
-            case 'B': {
-                i++;
-                CHECKARG
-                msport = HBPORT;
-                heartbeat_port = atoi(argv[i]);
-                hbmethod = 2;
-                break;
-            }
-            case 'L': {
-                i++;
-                if(!argv[i]) {
-                    fprintf(stderr, "\n"
-                        "Error: you must specify the amount of seconds for the loop\n"
-                        "\n");
-                    exit(1);
-                }
-                iwannaloop = atoi(argv[i]);
-                break;
-            }
-            case 't': {
-                i++;
-                if(!argv[i]) {
-                    fprintf(stderr, "\n"
-                        "Error: you must select an enctype number\n"
-                        "\n");
-                    exit(1);
-                }
-                if(tolower(argv[i][0]) == 'x') {
-                    myenctype = -1;
-                } else {
-                    myenctype = atoi(argv[i]);
-                }
-                break;
-            }
-            case 'c': {
-                show_countries();
-                return(0);
-                break;
-            }
-            case 'y': {
-                i++;
-                if(!argv[i] || !argv[i + 1]) {
-                    fprintf(stderr, "\n"
-                        "Error: you must choose a gamename and a game key\n"
-                        "\n");
-                    exit(1);
-                }
-                gamestr = argv[i];
-                i++;
-                // retro-compatibility only
-                break;
-            }
-            case 'Y': {
-                i++;
-                if(!argv[i] || !argv[i + 1]) {
-                    fprintf(stderr, "\n"
-                        "Error: you must choose a gamename and a gamekey\n"
-                        "\n");
-                    exit(1);
-                }
-                msgamename = argv[i];
-                i++;
-                msgamekey = argv[i];
-                if(strlen(msgamekey) > ((VALIDATESZ * 3) / 4)) {
-                    fprintf(stderr, "\n"
-                        "Error: the gamekey you have specified is too long\n"
-                        "\n");
-                    exit(1);
-                }
-                break;
-            }
-            case 'p': {
-                i++;
-                CHECKARG
-                len = mystrcpy(gslist_path, argv[i], sizeof(gslist_path));
-                if(gslist_path[len - 1] != PATH_SLASH) {
-                    gslist_path[len]     = PATH_SLASH;
-                    gslist_path[len + 1] = 0;
-                }
-                break;
-            }
-            case 'Q': {
-                i++;
-                if(ARGHELP) {
-                    fprintf(stderr, "- list of supported game queries and their number:\n");
-                    i = 0;
-                    while(switch_type_query(i, NULL, NULL, NULL, 2)) {
-                        if(!(++i % 3)) fputc('\n', stderr);
-                    }
-                    fprintf(stderr, "\n    or a C string containing the custom packet to send like: -Q \"hel\\x6c\\x6f\"\n");
-                    return(0);
-                }
-                //megaquery = atoi(argv[i]);
-                set_custom_multi_query(megaquery)
-                break;
-            }
-            case 'D': {
-                i++;
-                if(!argv[i]) {
-                    fprintf(stderr, "\n"
-                        "Error: you must choose the milliseconds to wait\n"
-                        "\n");
-                    exit(1);
-                }
-                scandelay = atoi(argv[i]);
-                #ifdef WIN32
-                #else
-                scandelay *= 1000;
-                #endif
-                break;
-            }
-            case 'X': {
-                i++;
-                if(!argv[i]) {
-                    fprintf(stderr, "\n"
-                        "Error: you must specify the informations you want to return from enctypex\n"
-                        "       for example: -t -1 -X \\hostname\\gamever\\gametype\\gamemode\\numplayers\n"
-                        "\n");
-                    exit(1);
-                }
-                enctypex_query = argv[i];
-                if(!enctypex_query[0] || !strcmp(enctypex_query, "\\") || !strcmp(enctypex_query, "\\\\")) {
-                    enctypex_query = ENCTYPEX_QUERY_GSLIST;
-                }
-                break;
-            }
-            case 'G': {
-                force_natneg    = 1;
-                break;
-            }
-            case 'E': {
-                ignore_errors   = 1;
-                break;
-            }
-            case 'C': {
-                enctypex_data_cleaner_level = 0;
-                break;
-            }
-            case 'e': {
-                show_examples();
-                return(0);
-                break;
-            }
-            case 'z': {
-                i++;
-                if(!argv[i]) {
-                    fprintf(stderr, "\n"
-                        "Error: you must choose the input servers list\n"
-                        "\n");
-                    exit(1);
-                }
-                fdlist = argv[i];
-                gamestr = "";
-                mshost = "127.0.0.1";
-                mymshost = mshost;
-                break;
-            }
-            case 'R': {
-                enctypex_type = 0x20;
-                break;
-            }
-            case '0': {
-                no_reping = 1;
-                break;
-            }
-            default: {
-                fprintf(stderr, "\n"
-                    "Error: wrong argument (%s)\n"
-                    "\n", argv[i]);
-                exit(1);
-                break;
-            }
-        }
-    }
 
 #ifndef WIN32
     scandelay *= 1000;
@@ -764,6 +436,10 @@ int gslist_main(int argc, char *argv[]) {
     }
 
     dnsdb(NULL);    // initialize the dns cache database
+
+    if(!enctypex_query[0] || !strcmp(enctypex_query, "\\") || !strcmp(enctypex_query, "\\\\")) {
+        enctypex_query = ENCTYPEX_QUERY_GSLIST;
+    }
 
     if(!gamestr) {
         fprintf(stderr, "\n"
@@ -836,7 +512,7 @@ get_list:
     ipbuffer = ipport;
 
 handle_servers:
-    servers = 0;
+    *num_servers = 0;
     while(len >= 6) {
         ipc = myinetntoa(ipport->ip);
 
@@ -879,14 +555,16 @@ handle_servers:
             system(tmpexec);
         }
 
-        servers++;
+        *num_servers = *num_servers + 1;
         ipport++;
         len -= 6;
     }
 
-    if(!quiet && itsok) fprintf(stderr, "\n%u servers found\n\n", servers);
+    if(!quiet && itsok) fprintf(stderr, "\n%u servers found\n\n", *num_servers);
+    // fprintf(stderr, "\n%u servers found\n\n", *num_servers);
 
     if((myenctype < 0) && ipport && enctypex_query[0]) {
+        *num_servers = 0;
         for(len = 0;;) {
             len = enctypex_decoder_convert_to_ipport(buff + enctypex_data.start, enctypex_data.offset - enctypex_data.start, NULL, enctypex_info, sizeof(enctypex_info), len);
             if(len <= 0) break;
@@ -894,15 +572,15 @@ handle_servers:
                 lame_room_visualization(enctypex_info);
                 continue;
             }
-            if(sql) {
-            } else {
-                fprintf(fdout, "%s\n", enctypex_info);
-            }
+            char *server = servers[*num_servers];
+            sprintf(server, "%s", enctypex_info);
+            *num_servers = *num_servers + 1;
         }
     }
+
     if((megaquery >= 0) || ((megaquery == -2) && multi_query_custom_binary)) {
         fprintf(stderr, "- querying servers:\n");
-        mega_query_scan(gamestr, megaquery, ipbuffer, servers, 2);   // 3 is the default timeout
+        mega_query_scan(gamestr, megaquery, ipbuffer, *num_servers, 2);   // 3 is the default timeout
     }
 
     fflush(fdout);
@@ -937,7 +615,6 @@ handle_servers:
     FREEX(buff);
     return(0);
 }
-
 
 
 void lame_room_visualization(u8 *buff) {
