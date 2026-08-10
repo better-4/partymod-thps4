@@ -1,151 +1,131 @@
 #include "qb.h"
-#define UNUSED 0
-
-typedef uint32_t unused_t;
-
-// A CStruct in THPS4 is a linked list of components, which are akin to key-value pairs.
-// Components are identified by checksum, representing the CRC32 of the component's name.
-// They also contain a type (int, str, CStruct, etc.) and associated value.
-
-// All `Add*` functions push a new component to the end of the list.
-// All `Get*` functions find the first component in the list with the desired type and return 1,
-// or return 0 if no such component is found.
-// Therefore, when changing component values, remove the component before adding it.
-
-// In the THPS4 binary, All add/get functions have two variants: 
-//
-//  * one which takes `uint32_t checksum` as the first argument
-//  * one which takes `const char *name` as the first argument, computes its CRC32,
-//    then calls the previous function.
-//
-// Here, we only point to the functions which take checksum for performance.
 
 // We mock __thiscall calling convention by using __fastcall and a dummy second parameter.
-// `this_` loaded into `ecx`, `_` loaded into `edx` and safely ignored, rest pushed onto stack.
+// `this` loaded into `ecx`, `_` loaded into `edx` and safely ignored, rest pushed onto stack.
+#define UNUSED 0
+typedef uint32_t unused_t;
 
-// Any `assert` arguments should be passed 0; we don't patch the debug print functions they call.
+// class CStruct
 
-
-// CArray::
-
-typedef void(__fastcall* _CArray_New_t)(CArray *this_);
-_CArray_New_t _CArray_New = (_CArray_New_t)0x004085d0; // Script::CArray::CArray
-
-CArray *CArray_New() {
-	CArray *this_ = (CArray *)malloc(CARRAY_SIZE * sizeof(char));
-    _CArray_New(this_);
-    return this_;
-}
-
-void CArray_Free(CArray *this_) {
-    // TODO(ellie): check if need to call destructor
-    free(this_);
-}
-
-typedef void(__fastcall* SetStructure_t)(CStruct *this_, unused_t, uint32_t index, CArray *value);
-SetStructure_t SetStructure = (SetStructure_t)0x00408770; // Script::CArray::SetStructure
-
-void CArray_SetStructure(CArray *this_, uint32_t index, CStruct *value) {
-    SetStructure(this_, UNUSED, index, value);
-}
-
-typedef void(__fastcall* SetSizeAndType_t)(CStruct *this_, unused_t, uint32_t size, uint32_t type);
-SetSizeAndType_t SetSizeAndType = (SetSizeAndType_t)0x00408660; // Script::CArray::SetSizeAndType
-
-void CArray_SetSizeAndType(CArray *this_, uint32_t size, uint32_t type) {
-    SetSizeAndType(this_, UNUSED, size, type);
-}
-
-// CStruct::
-
-typedef void(__fastcall* _CStruct_New_t)(CStruct *this_);
-_CStruct_New_t _CStruct_New = (_CStruct_New_t)0x00415710; // Script::CStruct::CStruct
+typedef void(__fastcall* _CStruct_New_t)(CStruct *this);
+_CStruct_New_t _CStruct_New = (_CStruct_New_t)0x00415710;
 
 CStruct *CStruct_New() {
-	CStruct *this_ = (CStruct *)malloc(CSTRUCT_SIZE * sizeof(char));
-    _CStruct_New(this_);
-    return this_;
+	CStruct *this = (CStruct *)malloc(sizeof(CStruct));
+    _CStruct_New(this);
+    return this;
 }
 
-void CStruct_Free(CStruct *this_) {
+void CStruct_Free(CStruct *this) {
     // TODO(ellie): check if need to call destructor
-    free(this_);
+    free(this);
 }
 
-typedef void(__fastcall* AddArray_t)(CStruct *this_, unused_t, uint32_t checksum, CArray *value);
-AddArray_t AddArray = (AddArray_t)0x004171e0; // Script::CStruct::AddArray
+typedef void(__fastcall* _CStruct_AddArray_t)(CStruct *this, unused_t, uint32_t checksum, CArray *value);
+_CStruct_AddArray_t _CStruct_AddArray = (_CStruct_AddArray_t)0x004171e0;
 
-void CStruct_AddArray(CStruct *this_, uint32_t checksum, CArray *value) {
-    AddArray(this_, UNUSED, checksum, value);
+void CStruct_AddArray(CStruct *this, uint32_t checksum, CArray *value) {
+    _CStruct_AddArray(this, UNUSED, checksum, value);
 }
 
-typedef void(__fastcall* AddChecksum_t)(CStruct *this_, unused_t, uint32_t checksum, uint32_t value);
-AddChecksum_t AddChecksum = (AddChecksum_t)0x00416a00; // Script::CStruct::AddChecksum
+typedef void(__fastcall* _CStruct_AddChecksum_t)(CStruct *this, unused_t, uint32_t checksum, uint32_t value);
+_CStruct_AddChecksum_t _CStruct_AddChecksum = (_CStruct_AddChecksum_t)0x00416a00;
 
-void CStruct_AddChecksum(CStruct *this_, uint32_t checksum, uint32_t value) {
-    AddChecksum(this_, UNUSED, checksum, value);
+void CStruct_AddChecksum(CStruct *this, uint32_t checksum, uint32_t value) {
+    _CStruct_AddChecksum(this, UNUSED, checksum, value);
 }
 
-typedef void(__fastcall* AddFloat_t)(CStruct *this_, unused_t, uint32_t checksum, float value);
-AddFloat_t AddFloat = (AddFloat_t)0x00416830; // Script::CStruct::AddFloat
+typedef void(__fastcall* _CStruct_AddFloat_t)(CStruct *this, unused_t, uint32_t checksum, float value);
+_CStruct_AddFloat_t _CStruct_AddFloat = (_CStruct_AddFloat_t)0x00416830;
 
-void CStruct_AddFloat(CStruct *this_, uint32_t checksum, float value) {
-    AddFloat(this_, UNUSED, checksum, value);
+void CStruct_AddFloat(CStruct *this, uint32_t checksum, float value) {
+    _CStruct_AddFloat(this, UNUSED, checksum, value);
 }
 
-typedef void(__fastcall* AddInteger_t)(CStruct *this_, unused_t, uint32_t checksum, int value);
-AddInteger_t AddInteger = (AddInteger_t)0x00416660; // Script::CStruct::AddInteger
+typedef void(__fastcall* _CStruct_AddInteger_t)(CStruct *this, unused_t, uint32_t checksum, int value);
+_CStruct_AddInteger_t _CStruct_AddInteger = (_CStruct_AddInteger_t)0x00416660;
 
-void CStruct_AddInteger(CStruct *this_, uint32_t checksum, int value) {
-    AddInteger(this_, UNUSED, checksum, value);
+void CStruct_AddInteger(CStruct *this, uint32_t checksum, int value) {
+    _CStruct_AddInteger(this, UNUSED, checksum, value);
 }
 
-typedef void(__fastcall* AddString_t)(CStruct *this_, unused_t, uint32_t checksum, char *value);
-AddString_t AddString = (AddString_t)0x004162f0; // Script::CStruct::AddString
+typedef void(__fastcall* _CStruct_AddString_t)(CStruct *this, unused_t, uint32_t checksum, char *value);
+_CStruct_AddString_t _CStruct_AddString = (_CStruct_AddString_t)0x004162f0;
 
-void CStruct_AddString(CStruct *this_, uint32_t checksum, char *value) {
-    AddString(this_, UNUSED, checksum, value);
+void CStruct_AddString(CStruct *this, uint32_t checksum, char *value) {
+    _CStruct_AddString(this, UNUSED, checksum, value);
 }
 
-typedef int(__fastcall* GetChecksum_t)(CStruct *this_, unused_t, uint32_t checksum, uint32_t *ret, int assert);
-GetChecksum_t GetChecksum = (GetChecksum_t)0x004184b0; // Script::CStruct::GetChecksum
+typedef int(__fastcall* _CStruct_GetChecksum_t)(CStruct *this, unused_t, uint32_t checksum, uint32_t *ret, int assert);
+_CStruct_GetChecksum_t _CStruct_GetChecksum = (_CStruct_GetChecksum_t)0x004184b0;
 
-int CStruct_GetChecksum(CStruct *this_, uint32_t checksum, uint32_t *ret, int assert) {
-    return GetChecksum(this_, UNUSED, checksum, ret, assert);
+int CStruct_GetChecksum(CStruct *this, uint32_t checksum, uint32_t *ret, int assert) {
+    return _CStruct_GetChecksum(this, UNUSED, checksum, ret, assert);
 }
 
-typedef int(__fastcall* GetFloat_t)(CStruct *this_, unused_t, uint32_t checksum, float *ret, int assert);
-GetFloat_t GetFloat = (GetFloat_t)0x00418100; // Script::CStruct::GetFloat
+typedef int(__fastcall* _CStruct_GetFloat_t)(CStruct *this, unused_t, uint32_t checksum, float *ret, int assert);
+_CStruct_GetFloat_t _CStruct_GetFloat = (_CStruct_GetFloat_t)0x00418100;
 
-int CStruct_GetFloat(CStruct *this_, uint32_t checksum, float *ret, int assert) {
-    return GetFloat(this_, UNUSED, checksum, ret, assert);
+int CStruct_GetFloat(CStruct *this, uint32_t checksum, float *ret, int assert) {
+    return _CStruct_GetFloat(this, UNUSED, checksum, ret, assert);
 }
 
-typedef int(__fastcall* GetInteger_t)(CStruct *this_, unused_t, uint32_t checksum, int *ret, int assert);
-GetInteger_t GetInteger = (GetInteger_t)0x00417ea0; // Script::CStruct::GetInteger
+typedef int(__fastcall* _CStruct_GetInteger_t)(CStruct *this, unused_t, uint32_t checksum, int *ret, int assert);
+_CStruct_GetInteger_t _CStruct_GetInteger = (_CStruct_GetInteger_t)0x00417ea0;
 
-int CStruct_GetInteger(CStruct *this_, uint32_t checksum, int *ret, int assert) {
-    return GetInteger(this_, UNUSED, checksum, ret, assert);
+int CStruct_GetInteger(CStruct *this, uint32_t checksum, int *ret, int assert) {
+    return _CStruct_GetInteger(this, UNUSED, checksum, ret, assert);
 }
 
-typedef int(__fastcall* GetString_t)(CStruct *this_, unused_t, uint32_t checksum, const char **ret, int assert);
-GetString_t GetString = (GetString_t)0x00417ff0; // Script::CStruct::GetString
+typedef int(__fastcall* _CStruct_GetString_t)(CStruct *this, unused_t, uint32_t checksum, const char **ret, int assert);
+_CStruct_GetString_t _CStruct_GetString = (_CStruct_GetString_t)0x00417ff0;
 
-int CStruct_GetString(CStruct *this_, uint32_t checksum, const char **ret, int assert) {
-    return GetString(this_, UNUSED, checksum, ret, assert);
+int CStruct_GetString(CStruct *this, uint32_t checksum, const char **ret, int assert) {
+    return _CStruct_GetString(this, UNUSED, checksum, ret, assert);
 }
 
-typedef void(__fastcall* RemoveComponent_t)(CStruct *this_, unused_t, uint32_t checksum);
-RemoveComponent_t RemoveComponent = (RemoveComponent_t)0x00415b20; // Script::CStruct::RemoveComponent
+typedef void(__fastcall* _CStruct_RemoveComponent_t)(CStruct *this, unused_t, uint32_t checksum);
+_CStruct_RemoveComponent_t _CStruct_RemoveComponent = (_CStruct_RemoveComponent_t)0x00415b20;
 
-void CStruct_RemoveComponent(CStruct *this_, uint32_t checksum) {
-    RemoveComponent(this_, UNUSED, checksum);
+void CStruct_RemoveComponent(CStruct *this, uint32_t checksum) {
+    _CStruct_RemoveComponent(this, UNUSED, checksum);
 }
 
-// CScript::
+// class CArray
 
-CStruct *CScript_GetParams(CScript *this_) {
+typedef void(__fastcall* _CArray_New_t)(CArray *this);
+_CArray_New_t _CArray_New = (_CArray_New_t)0x004085d0;
+
+CArray *CArray_New() {
+	CArray *this = (CArray *)malloc(sizeof(CArray));
+    _CArray_New(this);
+    return this;
+}
+
+void CArray_Free(CArray *this) {
+    // TODO(ellie): check if need to call destructor
+    free(this);
+}
+
+typedef void(__fastcall* _CArray_SetStructure_t)(CStruct *this, unused_t, uint32_t index, CArray *value);
+_CArray_SetStructure_t _CArray_SetStructure = (_CArray_SetStructure_t)0x00408770;
+
+void CArray_SetStructure(CArray *this, uint32_t index, CStruct *value) {
+    _CArray_SetStructure(this, UNUSED, index, value);
+}
+
+typedef void(__fastcall* _CArray_SetSizeAndType_t)(CStruct *this, unused_t, uint32_t size, uint32_t type);
+_CArray_SetSizeAndType_t _CArray_SetSizeAndType = (_CArray_SetSizeAndType_t)0x00408660;
+
+void CArray_SetSizeAndType(CArray *this, uint32_t size, uint32_t type) {
+    _CArray_SetSizeAndType(this, UNUSED, size, type);
+}
+
+// class CScript
+
+CStruct *CScript_GetParams(CScript *this) {
     // inlined during compilation; access member directly
-    return *(CStruct **)(((char *)this_) + 0x14);
+    return this->params;
+    // return *(CStruct **)(((char *)this) + 0x14);
 }
 
