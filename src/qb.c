@@ -1,5 +1,7 @@
 #include "qb.h"
 
+#include <string.h>
+
 // We mock __thiscall calling convention by using __fastcall and a dummy second parameter.
 // `this` loaded into `ecx`, `_` loaded into `edx` and safely ignored, rest pushed onto stack.
 #define UNUSED 0
@@ -16,8 +18,11 @@ CStruct *CStruct_New() {
     return this;
 }
 
+typedef void(__fastcall* _CStruct_Clear_t)(CStruct *this);
+_CStruct_Clear_t _CStruct_Clear = (_CStruct_Clear_t)0x004159e0;
+
 void CStruct_Free(CStruct *this) {
-    // TODO(ellie): check if need to call destructor
+    _CStruct_Clear(this);
     free(this);
 }
 
@@ -102,8 +107,12 @@ CArray *CArray_New() {
     return this;
 }
 
+typedef void(__cdecl* _CleanUpArray_t)(CArray *this);
+_CleanUpArray_t _CleanUpArray = (_CleanUpArray_t)0x00414d50;
+
 void CArray_Free(CArray *this) {
-    // TODO(ellie): check if need to call destructor
+    // NOTE (ellie): Not sure whether Script::CArray::Clear or Script::CleanUpArray is more apt here
+    _CleanUpArray(this);
     free(this);
 }
 

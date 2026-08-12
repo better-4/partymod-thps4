@@ -16,6 +16,7 @@
 #include <script.h>
 #include <qb.h>
 #include <gslist/gslist.h>
+#include <winsock.h>
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0
@@ -615,38 +616,35 @@ int __cdecl CFunc_ChangeGlobal(CStruct *params, CScript *script) {
 	return 1;
 }
 
-// XXX (ellie): Max 256 servers, 256 bytes each, potential for buffer overflow but surely we'll be fine... right?
-char servers[256][256] = {{0}};
-uint32_t num_servers = 0;
-
 int __cdecl CFunc_GetServerList(CStruct *params, CScript *script) {
-	CStruct *struc = CStruct_New();
-	CStruct_AddString(struc, 0x278081f3/*test*/, "test");
-
-	CArray *array = CArray_New();
-	CArray_SetSizeAndType(array, 1, TYPE_STRUCTURE);
-	CArray_SetStructure(array, 0, struc);
+	// XXX (ellie): Max 256 servers, 256 bytes each, potential for buffer overflow but surely we'll be fine... right?
+	char servers[256][256] = {{0}};
+	uint32_t num_servers = 0;
 
 	gslist("thps4pc", "\\hostname\\gamever\\gametype\\gamemode\\mapname\\numplayers", servers, &num_servers);
 
+	CArray *array = CArray_New();
+	CArray_SetSizeAndType(array, num_servers, TYPE_STRUCTURE);
+
 	for (int i = 0; i < num_servers; i++) {
-		char ip[15] = "",
-		     port[5] = "",
+		char ip[16] = "",
 		     hostname[64] = "",
 			 gamever[64] = "",
 		     gametype[64] = "",
 		     gamemode[64] = "",
 			 mapname[64] = "",
 		     numplayers[64] = "";
+		uint32_t port = 0;
 
 		char *server = servers[i];
-		int successful = sscanf(server, "%[^:]:%d \\hostname\\%[^\\]\\gamever\\%[^\\]\\gametype\\%[^\\]\\gamemode\\%[^\\]\\mapname\\%[^\\]\\numplayers\\%[^\\]", ip, &port, hostname, gamever, gametype, gamemode, mapname, numplayers);
+		// TODO: use sscanf_s
+		sscanf(server, "%[^:]:%d \\hostname\\%[^\\]\\gamever\\%[^\\]\\gametype\\%[^\\]\\gamemode\\%[^\\]\\mapname\\%[^\\]\\numplayers\\%[^\\]", ip, &port, hostname, gamever, gametype, gamemode, mapname, numplayers);
 
 		printLog("Server %d (%d chars): %s\n", i, strlen(server), server);
-		printLog("%d successful matches\n", successful);
 		printLog("Server %d: %s:%d hostname=%s gamever=%s gametype=%s gamemode=%s mapname=%s numplayers=%s\n", i, ip, port, hostname, gamever, gametype, gamemode, mapname, numplayers);
 
 		CStruct *struc = CStruct_New();
+		CStruct_AddInteger(struc, 0x7f8c98fe/*index*/, i);
 		CStruct_AddString(struc, 0x5a1c4cd2/*ip*/, ip);
 		CStruct_AddInteger(struc, 0xbc6ea233/*port*/, port);
 		CStruct_AddString(struc, 0x1aae3fee/*hostname*/, hostname);
@@ -656,12 +654,13 @@ int __cdecl CFunc_GetServerList(CStruct *params, CScript *script) {
 		CStruct_AddString(struc, 0xcdef908e/*mapname*/, mapname);
 		CStruct_AddString(struc, 0x99a30c62/*numplayers*/, numplayers);
 		CArray_SetStructure(array, i, struc);
+		// CStruct_Free(struc);
 	}
 
 	CStruct *out = CScript_GetParams(script);
 	CStruct_AddArray(out, 0x30b77607/*server_list*/, array);
-
 	CArray_Free(array);
+
 	return 1;
 }
 
