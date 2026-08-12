@@ -11,6 +11,7 @@
 #include <patch.h>
 #include <script.h>
 #include <qb.h>
+#include <input.h>
 
 // device is +0x100
 typedef struct {
@@ -67,11 +68,20 @@ struct inputsettings inputsettings;
 struct keybinds keybinds;
 struct controllerbinds padbinds;
 
-// genuine physical L1/R1 shoulder state, updated every frame in pollController.
-// completely independent of leftSpin/rightSpin's controlData slot (and therefore
-// SpinButtonMode) - used only by checkSpineTransferButtons' L1/R1-based modes.
 uint8_t physicalL1Held = 0;
 uint8_t physicalR1Held = 0;
+
+uint8_t DpadLeft = 0;
+uint8_t DpadRight = 0;
+static uint8_t prevDpadLeft = 0;
+static uint8_t prevDpadRight = 0;
+
+static uint8_t keyboardA = 0;
+static uint8_t keyboardD = 0;
+static uint8_t prevKeyboardA = 0;
+static uint8_t prevKeyboardD = 0;
+
+extern int ObserveCamCycle(int direction);
 
 uint8_t isUsingKeyboard = 1;
 
@@ -256,11 +266,21 @@ void pollController(device *dev, SDL_GameController *controller) {
 		dev->isValid = 1;
 		dev->isPluggedIn = 1;
 
-		// track genuine physical L1/R1 directly, regardless of any bind - used by
-		// checkSpineTransferButtons' L1/R1-based modes so they're never affected by
-		// SpinButtonMode remapping leftSpin/rightSpin elsewhere.
 		physicalL1Held = getButton(controller, CONTROLLER_BUTTON_LEFTSHOULDER) ? 1 : 0;
 		physicalR1Held = getButton(controller, CONTROLLER_BUTTON_RIGHTSHOULDER) ? 1 : 0;
+
+		DpadLeft = getButton(controller, CONTROLLER_BUTTON_DPAD_LEFT) ? 1 : 0;
+		DpadRight = getButton(controller, CONTROLLER_BUTTON_DPAD_RIGHT) ? 1 : 0;
+
+		if (local_observing) {
+			if (DpadRight && !prevDpadRight) {
+				ObserveCamCycle(1);
+			} else if (DpadLeft && !prevDpadLeft) {
+				ObserveCamCycle(-1);
+			}
+		}
+		prevDpadLeft = DpadLeft;
+		prevDpadRight = DpadRight;
 
 		// buttons
 		if (getButton(controller, padbinds.menu)) {
@@ -528,6 +548,18 @@ void pollKeyboard(device* dev) {
 	uint8_t* keyboardState = SDL_GetKeyboardState(NULL);
 
 	processMenuBinds(keyboardState);
+
+	keyboardA = getKeyState(keyboardState, SDL_SCANCODE_A) ? 1 : 0;
+	keyboardD = getKeyState(keyboardState, SDL_SCANCODE_D) ? 1 : 0;
+	if (local_observing) {
+		if (keyboardD && !prevKeyboardD) {
+			ObserveCamCycle(1);
+		} else if (keyboardA && !prevKeyboardA) {
+			ObserveCamCycle(-1);
+		}
+	}
+	prevKeyboardA = keyboardA;
+	prevKeyboardD = keyboardD;
 
 	if (*addr_isKeyboardOnScreen && inputsettings.useKeyboardControls) {
 		return;
@@ -946,6 +978,10 @@ void __cdecl processController(device *dev) {
 		}
 	}
 
+	// Hooked here so that both kb + controller players run this
+	SnapObsCameraBack();
+	ObsInputDisabled();
+
 	dev->controlData[2] = ~dev->controlData[2];
 	dev->controlData[3] = ~dev->controlData[3];
 	//dev->controlData[20] = ~dev->controlData[20];
@@ -1023,7 +1059,7 @@ void __stdcall initManager() {
 	if (inputsettings.isPs2Controls) {
 		patchPs2Buttons();
 		patchSpinKeys();
-	} 
+	}
 }
 
 uint8_t movieSkipHasBeenPressed = 0;
