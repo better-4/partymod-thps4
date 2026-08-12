@@ -17,6 +17,7 @@ set(SOURCE_FILES
 	"${SRC}/gfx.c"
 	"${SRC}/gfx_buffers.c"
 	"${SRC}/qb.c"
+	"${SRC}/gslist/"
 )
 
 set(HEADER_FILES
@@ -30,6 +31,20 @@ set(HEADER_FILES
 	"${SRC}/script.h"
 	"${SRC}/gfx.h"
 	"${SRC}/qb.h"
+
+	"${SRC}/gslist/countries.h"
+	"${SRC}/gslist/enctypex_decoder.h"
+	"${SRC}/gslist/gslegacy.h"
+	"${SRC}/gslist/gsmsalg.h"
+	"${SRC}/gslist/gsmyfunc.h"
+	"${SRC}/gslist/gsnatneg.h"
+	"${SRC}/gslist/gsshow.h"
+	"${SRC}/gslist/gssql.h"
+	"${SRC}/gslist/gswtray.h"
+	"${SRC}/gslist/multi_query.h"
+	"${SRC}/gslist/winerr.h"
+	"${SRC}/gslist/stristr.h"
+	"${SRC}/gslist/gslist.h"
 )
 
 list(APPEND INCLUDES ${THIRDPARTY})
@@ -39,6 +54,7 @@ find_package(SDL2 REQUIRED)
 list(APPEND LIBS
 	SDL2::SDL2
 	SDL2::SDL2main
+	wsock32
 )
 list(APPEND INCLUDES ${SDL2_INCLUDE_DIRS})
 

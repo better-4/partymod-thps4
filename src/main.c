@@ -15,6 +15,8 @@
 #include <patch.h>
 #include <script.h>
 #include <qb.h>
+#include <gslist/gslist.h>
+#include <winsock.h>
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0
@@ -60,6 +62,7 @@
 //   - Removed serial check that disallowed same cd key players from joining each other with patchSerialCheck();
 // ============================================================================
 
+// XXX (ellie): 0x00ab5b48 is actually Mdl::Skate::Instance
 #define PARTY_ADDR_GAMENET_MANAGER      0x00ab5b48   // the GameNetManager singleton -- represents THIS machine's whole live network session (connections, player list, etc). NOT the same object as the local-player singleton below.
 #define PARTY_ADDR_GET_LOCAL_PLAYER     0x00489ac0
 #define PARTY_FLAG_LOCAL_PLAYER   0x00000001
@@ -68,6 +71,7 @@
 #define PARTY_FLAG_JUMPING_IN     0x00000010
 #define PARTY_FLAG_FULLY_IN       0x00000020
 #define PARTY_PLAYERINFO_FLAGS_OFFSET 0xf8
+// XXX (ellie): 0x00ab5394 is actually GameNet::Manager::Instance
 #define PARTY_ADDR_LOCAL_PLAYER_SINGLETON 0x00ab5394   // separate singleton -- "my own local-player context". What GetLocalPlayer/RequestObserverMode/IsHost/LoadPendingPlayers all actually expect. Mixing this up with PARTY_ADDR_GAMENET_MANAGER was the source of an early, hard-to-find crash (garbage pointer -> IEEE-754 bit pattern for pi).
 #define PARTY_ADDR_IS_HOST 0x0048ead0
 #define PARTY_ADDR_IS_OBSERVING 0x00491560   /* confirmed via JMP-tail trace from IsObserving_cfunc */
@@ -612,6 +616,54 @@ int __cdecl CFunc_ChangeGlobal(CStruct *params, CScript *script) {
 	return 1;
 }
 
+int __cdecl CFunc_GetServerList(CStruct *params, CScript *script) {
+	// XXX (ellie): Max 256 servers, 256 bytes each, potential for buffer overflow but surely we'll be fine... right?
+	char servers[256][256] = {{0}};
+	uint32_t num_servers = 0;
+
+	gslist("thps4pc", "\\hostname\\gamever\\gametype\\gamemode\\mapname\\numplayers", servers, &num_servers);
+
+	CArray *array = CArray_New();
+	CArray_SetSizeAndType(array, num_servers, TYPE_STRUCTURE);
+
+	for (int i = 0; i < num_servers; i++) {
+		char ip[16] = "",
+		     hostname[64] = "",
+			 gamever[64] = "",
+		     gametype[64] = "",
+		     gamemode[64] = "",
+			 mapname[64] = "",
+		     numplayers[64] = "";
+		uint32_t port = 0;
+
+		char *server = servers[i];
+		// TODO: use sscanf_s
+		sscanf(server, "%[^:]:%d \\hostname\\%[^\\]\\gamever\\%[^\\]\\gametype\\%[^\\]\\gamemode\\%[^\\]\\mapname\\%[^\\]\\numplayers\\%[^\\]", ip, &port, hostname, gamever, gametype, gamemode, mapname, numplayers);
+
+		printLog("Server %d (%d chars): %s\n", i, strlen(server), server);
+		printLog("Server %d: %s:%d hostname=%s gamever=%s gametype=%s gamemode=%s mapname=%s numplayers=%s\n", i, ip, port, hostname, gamever, gametype, gamemode, mapname, numplayers);
+
+		CStruct *struc = CStruct_New();
+		CStruct_AddInteger(struc, 0x7f8c98fe/*index*/, i);
+		CStruct_AddString(struc, 0x5a1c4cd2/*ip*/, ip);
+		CStruct_AddInteger(struc, 0xbc6ea233/*port*/, port);
+		CStruct_AddString(struc, 0x1aae3fee/*hostname*/, hostname);
+		CStruct_AddString(struc, 0x748da1c8/*gamever*/, gamever);
+		CStruct_AddString(struc, 0x2510a2e9/*gametype*/, gametype);
+		CStruct_AddString(struc, 0x3e04b26b/*gamemode*/, gamemode);
+		CStruct_AddString(struc, 0xcdef908e/*mapname*/, mapname);
+		CStruct_AddString(struc, 0x99a30c62/*numplayers*/, numplayers);
+		CArray_SetStructure(array, i, struc);
+		// CStruct_Free(struc);
+	}
+
+	CStruct *out = CScript_GetParams(script);
+	CStruct_AddArray(out, 0x30b77607/*server_list*/, array);
+	CArray_Free(array);
+
+	return 1;
+}
+
 // FIXME: still broken, not sure why
 double ledgeWarpFix(double n) {
 	//printf("DOING LEDGE WARP FIX\n");
@@ -931,6 +983,7 @@ void initPatch() {
 	addCFunc("ChangeGlobal", (void *)CFunc_ChangeGlobal);
 	addCFunc("SetSpinKeysControl", (void *)CFunc_SetSpinKeysControl);
 	addCFunc("SetSpineTransferControl", (void *)CFunc_SetSpineTransferControl);
+	addCFunc("GetServerList", (void *)CFunc_GetServerList);
 	if (isDebug) {
 	    printCFuncs();
 	}
