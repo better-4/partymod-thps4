@@ -984,6 +984,7 @@ void initPatch() {
 	addCFunc("SetSpinKeysControl", (void *)CFunc_SetSpinKeysControl);
 	addCFunc("SetSpineTransferControl", (void *)CFunc_SetSpineTransferControl);
 	addCFunc("GetServerList", (void *)CFunc_GetServerList);
+	addCFunc("SetPauseOnUnfocus", (void *)CFunc_SetPauseOnUnfocus);
 	if (isDebug) {
 	    printCFuncs();
 	}

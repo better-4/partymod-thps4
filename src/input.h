@@ -8,5 +8,6 @@ void patchInput();
 
 int CFunc_SetSpinKeysControl(CStruct *params);
 int CFunc_SetSpineTransferControl(CStruct *params);
+int CFunc_SetPauseOnUnfocus(CStruct *params);
 
 #endif

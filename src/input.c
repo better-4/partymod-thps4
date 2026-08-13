@@ -768,6 +768,8 @@ void do_text_input(char* text) {
 	}
 }
 
+int pause_on_unfocus = 0;
+
 void processEvent(SDL_Event *e) {
 	switch (e->type) {
 		case SDL_CONTROLLERDEVICEADDED:
@@ -822,14 +824,18 @@ void processEvent(SDL_Event *e) {
 			return;
 		case SDL_WINDOWEVENT:
 			if (e->window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-				uint8_t *isFocused = (uint8_t *)0x005a027c;
-				*isFocused = 0;
+				if (pause_on_unfocus) {
+					uint8_t *isFocused = (uint8_t *)0x005a027c;
+					*isFocused = 0;
+				}
 			} else if (e->window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-				uint8_t *recreateDevice = (uint8_t *)0x00aab48e;
-				*recreateDevice = 1;
+				if (pause_on_unfocus) {
+					uint8_t *recreateDevice = (uint8_t *)0x00aab48e;
+					*recreateDevice = 1;
 
-				uint8_t *isFocused = (uint8_t *)0x005a027c;
-				*isFocused = 1;
+					uint8_t *isFocused = (uint8_t *)0x005a027c;
+					*isFocused = 1;
+				}
 			}
 			return;
 		case SDL_QUIT: {
@@ -840,6 +846,17 @@ void processEvent(SDL_Event *e) {
 		default:
 			return;
 	}
+}
+
+int __cdecl CFunc_SetPauseOnUnfocus(CStruct *params) {
+	float index;
+	if (!CStruct_GetFloat(params, 0x7f8c98fe, &index, 0)) {
+		printLog("SetPauseOnUnfocus missing param \"index\" (0x7f8c98fe)\n");
+		return 0;
+	}
+	
+	pause_on_unfocus = (int)index;
+	printLog("Set pause_on_unfocus=%d\n", pause_on_unfocus);
 }
 
 void processEventsUnfocused() {
