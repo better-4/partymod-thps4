@@ -1,14 +1,14 @@
 #ifndef _INPUT_H_
 #define _INPUT_H_
 
-#include <qb.h>
+// typedef struct CStruct;
 
 int processIntroEvent();
 void patchInput();
 
-int CFunc_SetSpinKeysControl(CStruct *params);
-int CFunc_SetSpineTransferControl(CStruct *params);
-int CFunc_SetPauseOnUnfocus(CStruct *params);
+int CFunc_SetSpinKeysControl(void *params);
+int CFunc_SetSpineTransferControl(void *params);
+int CFunc_SetPauseOnUnfocus(void *params);
 
 extern uint8_t local_observing;
 void SnapObsCameraBack(void);

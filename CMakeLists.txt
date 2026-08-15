@@ -2,35 +2,30 @@ cmake_minimum_required(VERSION 3.10)
 
 project(thps4patch)
 
-set(SRC "${CMAKE_SOURCE_DIR}/src")
-set(THIRDPARTY "${CMAKE_SOURCE_DIR}/thirdparty")
+set(SRC "${PROJECT_SOURCE_DIR}/src")
+set(THIRDPARTY "${PROJECT_SOURCE_DIR}/thirdparty")
 
 set(SOURCE_FILES
 	"${SRC}/main.c"
 	"${SRC}/patch.c"
-	"${SRC}/cfuncs.c"
 	"${SRC}/config.c"
 	"${SRC}/input.c"
 	"${SRC}/hash.c"
-	"${SRC}/log.c"
 	"${SRC}/script.c"
 	"${SRC}/gfx.c"
 	"${SRC}/gfx_buffers.c"
-	"${SRC}/qb.c"
 	"${SRC}/gslist/"
 )
 
 set(HEADER_FILES
-	"${SRC}/cfuncs.h"
+	"${SRC}/main.h"
 	"${SRC}/global.h"
 	"${SRC}/patch.h"
 	"${SRC}/config.h"
 	"${SRC}/input.h"
 	"${SRC}/hash.h"
-	"${SRC}/log.h"
 	"${SRC}/script.h"
 	"${SRC}/gfx.h"
-	"${SRC}/qb.h"
 
 	"${SRC}/gslist/countries.h"
 	"${SRC}/gslist/enctypex_decoder.h"
@@ -58,7 +53,7 @@ list(APPEND LIBS
 )
 list(APPEND INCLUDES ${SDL2_INCLUDE_DIRS})
 
-add_library(partymod SHARED)
+add_library(partymod STATIC)
 
 target_sources(partymod PRIVATE
 	${SOURCE_FILES}
@@ -95,11 +90,11 @@ target_sources(incbin PUBLIC
 add_executable(partypatcher)
 
 target_sources(partypatcher PUBLIC
-	"${CMAKE_SOURCE_DIR}/patcher/main.c"
-	"${CMAKE_SOURCE_DIR}/patcher/data.c"
+	"${PROJECT_SOURCE_DIR}/patcher/main.c"
+	"${PROJECT_SOURCE_DIR}/patcher/data.c"
 )
 
 target_include_directories(partypatcher PUBLIC
-	"${CMAKE_SOURCE_DIR}/src"
+	"${PROJECT_SOURCE_DIR}/src"
 	${THIRDPARTY}
 )

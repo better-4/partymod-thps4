@@ -7,7 +7,6 @@
 
 #include <global.h>
 #include <input.h>
-#include <log.h>
 #include <patch.h>
 
 #include <SDL2/SDL.h>
@@ -38,8 +37,8 @@ graphicsSettings graphics_settings;
 SDL_Window *window;
 
 void dumpSettings() {
-	printLog("RESOLUTION X: %d\n", resX);
-	printLog("RESOLUTION Y: %d\n", resY);
+	printf("RESOLUTION X: %d\n", resX);
+	printf("RESOLUTION Y: %d\n", resY);
 }
 
 void enforceMaxResolution() {
@@ -81,7 +80,7 @@ void getOptimalRefreshRate(uint32_t *freq, uint32_t *interval) {
 
 	while (EnumDisplaySettings(NULL, i, &deviceMode)) {
 		if (deviceMode.dmPelsWidth == resX && deviceMode.dmPelsHeight == resY) {
-			printLog("MODE: %dx%d %dhz\n", deviceMode.dmPelsWidth, deviceMode.dmPelsHeight, deviceMode.dmDisplayFrequency);
+			printf("MODE: %dx%d %dhz\n", deviceMode.dmPelsWidth, deviceMode.dmPelsHeight, deviceMode.dmDisplayFrequency);
 			if (deviceMode.dmDisplayFrequency > *freq && ((deviceMode.dmDisplayFrequency % 60) == 0 || (*freq % 60) != 0) && (deviceMode.dmDisplayFrequency <= max_freq)) {
 				*freq = deviceMode.dmDisplayFrequency;
 				if ((*freq % 60) == 0) {
@@ -90,7 +89,7 @@ void getOptimalRefreshRate(uint32_t *freq, uint32_t *interval) {
 					*interval = 0;
 				}
 
-				printLog("USING DISPLAY MODE %d, %d\n", *freq, *interval);
+				printf("USING DISPLAY MODE %d, %d\n", *freq, *interval);
 			}
 		}
 
@@ -136,7 +135,7 @@ void createSDLWindow() {
 	window = SDL_CreateWindow("THPS4 - PARTYMOD", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, resX, resY, flags);   // TODO: fullscreen
 
 	if (!window) {
-		printLog("Failed to create window! Error: %s\n", SDL_GetError());
+		printf("Failed to create window! Error: %s\n", SDL_GetError());
 	}
 
 	SDL_SysWMinfo wmInfo;
@@ -225,7 +224,7 @@ int getIniBool(char *section, char *key, int def, char *file) {
 }
 
 void loadSettings() {
-	printLog("Loading settings\n");
+	printf("Loading settings\n");
 
 	char configFile[1024];
 	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);

@@ -7,10 +7,8 @@
 
 #include <config.h>
 #include <global.h>
-#include <log.h>
 #include <patch.h>
 #include <script.h>
-#include <qb.h>
 #include <input.h>
 
 // device is +0x100
@@ -82,6 +80,7 @@ static uint8_t prevKeyboardA = 0;
 static uint8_t prevKeyboardD = 0;
 
 extern int ObserveCamCycle(int direction);
+extern int CStruct_GetFloat(void *this_, uint32_t checksum, float *ret, int assert);
 
 uint8_t isUsingKeyboard = 1;
 
@@ -880,7 +879,7 @@ void processEvent(SDL_Event *e) {
 	}
 }
 
-int __cdecl CFunc_SetPauseOnUnfocus(CStruct *params) {
+int __cdecl CFunc_SetPauseOnUnfocus(void *params) {
 	float index;
 	if (!CStruct_GetFloat(params, 0x7f8c98fe, &index, 0)) {
 		printLog("SetPauseOnUnfocus missing param \"index\" (0x7f8c98fe)\n");
@@ -1524,7 +1523,7 @@ void patchInput() {
 	patchByte(0x00541fe0, 0xe9);	// patch CALL to JMP
 }
 
-int __cdecl CFunc_SetSpineTransferControl(CStruct *params) {
+int __cdecl CFunc_SetSpineTransferControl(void *params) {
 	float index;
 	if (!CStruct_GetFloat(params, 0x7f8c98fe, &index, 0)) {
 		printLog("SetSpineTransferControl missing param \"index\" (0x7f8c98fe)\n");
@@ -1535,7 +1534,7 @@ int __cdecl CFunc_SetSpineTransferControl(CStruct *params) {
 	printLog("Set spine_transfer_control_index=%d\n", spine_transfer_control_index);
 }
 
-int __cdecl CFunc_SetSpinKeysControl(CStruct *params) {
+int __cdecl CFunc_SetSpinKeysControl(void *params) {
 	float index;
 	if (!CStruct_GetFloat(params, 0x7f8c98fe, &index, 0)) {
 		printLog("SetSpinKeysControl missing param \"index\" (0x7f8c98fe)\n");

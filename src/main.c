@@ -11,463 +11,14 @@
 #include <gfx.h>
 #include <global.h>
 #include <input.h>
-#include <log.h>
 #include <patch.h>
 #include <script.h>
-#include <qb.h>
-#include <gslist/gslist.h>
 #include <winsock.h>
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0
 #define VERSION_NUMBER_FIX 11
-#define PARTY_ADDR_GAMENET_MANAGER 0x00ab5394
 
-
-static char configFile[1024];
-static void* local_observe_target = 0;
-uint8_t local_observing = 0;
-uint8_t voluntary_observing = 0;
-
-static void* (__fastcall* GetLocalPlayer)(void*) = (void*)0x00489ac0;
-static uint32_t(__fastcall* IsObserving_)(void*) = (void*)0x00491560;
-
-typedef void* (__fastcall* FirstPlayerInfo_t)(void* gameNetManager, int unused, void* searchCtx, char flag);
-typedef void* (__fastcall* NextPlayerInfo_t)(void* searchCtx);
-static FirstPlayerInfo_t FirstPlayerInfo = (FirstPlayerInfo_t)0x00489730;
-static NextPlayerInfo_t  NextPlayerInfo = (NextPlayerInfo_t)0x00432b10;
-
-typedef uint32_t(__fastcall* IsLocalPlayer_t)(void*);
-static IsLocalPlayer_t IsLocalPlayer_ = (IsLocalPlayer_t)0x00491540;
-
-typedef void(__fastcall* SetCamMode_t)(void* cameraComponent, int unused, int mode, float param);
-static SetCamMode_t SetCamMode = (SetCamMode_t)0x004d9bf0;
-
-typedef void(__fastcall* SetCamSkater_t)(void* cameraComponent, int unused, void* skater);
-static SetCamSkater_t SetCamSkater = (SetCamSkater_t)0x004dc310;
-
-typedef void* (__fastcall* GetCamSkater_t)(void* cameraComponent);
-static GetCamSkater_t GetCamSkater = (GetCamSkater_t)0x004dc320;
-
-
-static void* GetCameraComponent(void* self, void** outSkater) {
-	void* skater = *(void**)((uint8_t*)self + 0x14);
-	if (outSkater) *outSkater = skater;
-	return skater ? *(void**)((uint8_t*)skater + 0x37d4) : 0;
-}
-
-int __cdecl CFunc_ObserveSelf(CStruct* params) {
-    void* gamenetManager = *(void**)PARTY_ADDR_GAMENET_MANAGER;
-    void* self = gamenetManager ? GetLocalPlayer(gamenetManager) : 0;
-    if (!self) { printLog("CFunc_ObserveSelf: no local player\n"); return 1; }
-
-    void* mySkater = 0;
-    void* cam = GetCameraComponent(self, &mySkater);
-    if (!cam || !mySkater) { printLog("CFunc_ObserveSelf: missing cam or skater\n"); return 1; }
-
-    SetCamMode(cam, 0, 2, 0.0f);
-    SetCamSkater(cam, 0, mySkater);
-    local_observe_target = 0;
-    local_observing = 0;
-    voluntary_observing = 0;
-
-    return 1;
-}
-
-int __cdecl CFunc_IsBetterObserving(CStruct* params) {
-    return local_observing;
-}
-
-int __cdecl CFunc_IsVoluntaryObserving(CStruct* params) {
-	return voluntary_observing;
-}
-
-// Happens on game starts and ends, which desyncs tracking
-// Function runs every frame to check who you're observing vs tracked target, snaps back to target if mismatch
-static uint8_t camera_snapped = 0;
-void SnapObsCameraBack(void) {
-	if (!local_observing || !local_observe_target) { camera_snapped = 0; return; }
-
-	void* gamenetManager = *(void**)PARTY_ADDR_GAMENET_MANAGER;
-	void* self = gamenetManager ? GetLocalPlayer(gamenetManager) : 0;
-	if (!self) return;
-
-	void* mySkater = 0;
-	void* cam = GetCameraComponent(self, &mySkater);
-	if (!cam || !mySkater) return;
-
-	void* targetSkater = *(void**)((uint8_t*)local_observe_target + 0x14);
-	if (!targetSkater) return;
-
-	void* current = GetCamSkater(cam);
-	if (current == mySkater && current != targetSkater) 
-	{
-		if (camera_snapped) 
-		{
-			printLog("SnapObsCameraBack: camera was reset to self, reapplying target=%p\n", local_observe_target);
-		}
-		SetCamMode(cam, 0, 2, 0.0f);
-		SetCamSkater(cam, 0, targetSkater);
-		camera_snapped = 0;
-	} 
-	else 
-	{
-		camera_snapped = !(current == mySkater);
-	}
-}
-
-int __cdecl CFunc_BetterObserve(CStruct* params) {
-	void* gamenetManager = *(void**)PARTY_ADDR_GAMENET_MANAGER;
-	void* self = gamenetManager ? GetLocalPlayer(gamenetManager) : 0;
-	if (!self) { printLog("CFunc_BetterObserve: no local player\n"); return 1; }
-
-	void* target = 0;
-	struct { void* vtable; void* dummy; } searchCtx = { (void*)0x0058aa94, 0 };
-	void* p = FirstPlayerInfo(gamenetManager, 0, &searchCtx, '\x01');
-	while (p != 0)
-	{
-		if (p != self && !IsLocalPlayer_(p) && !IsObserving_(p)) { target = p; break; }
-		p = NextPlayerInfo(&searchCtx);
-	}
-	if (!target) { printLog("CFunc_BetterObserve: no other active player found\n"); return 1; }
-
-	void* targetSkater = *(void**)((uint8_t*)target + 0x14);
-	if (!targetSkater) { printLog("CFunc_BetterObserve: target has no skater\n"); return 1; }
-
-	void* mySkater = 0;
-	void* cam = GetCameraComponent(self, &mySkater);
-	if (!cam || !mySkater) { printLog("CFunc_BetterObserve: missing cam or own skater\n"); return 1; }
-
-	SetCamMode(cam, 0, 2, 0.0f);
-	SetCamSkater(cam, 0, targetSkater);
-	local_observing = 1;
-	local_observe_target = target;
-	voluntary_observing = 1;
-	return 1;
-}
-
-// Same as CFunc_BetterObserve, but unsets voluntary flag to indicate that we need to leave obs on game end
-int __cdecl CFunc_ObserveAfter0(CStruct* params) {
-	void* gamenetManager = *(void**)PARTY_ADDR_GAMENET_MANAGER;
-	void* self = gamenetManager ? GetLocalPlayer(gamenetManager) : 0;
-	if (!self) { printLog("CFunc_BetterObserve: no local player\n"); return 1; }
-
-	void* target = 0;
-	struct { void* vtable; void* dummy; } searchCtx = { (void*)0x0058aa94, 0 };
-	void* p = FirstPlayerInfo(gamenetManager, 0, &searchCtx, '\x01');
-	while (p != 0)
-	{
-		if (p != self && !IsLocalPlayer_(p) && !IsObserving_(p)) { target = p; break; }
-		p = NextPlayerInfo(&searchCtx);
-	}
-	if (!target) { printLog("CFunc_BetterObserve: no other active player found\n"); return 1; }
-
-	void* targetSkater = *(void**)((uint8_t*)target + 0x14);
-	if (!targetSkater) { printLog("CFunc_BetterObserve: target has no skater\n"); return 1; }
-
-	void* mySkater = 0;
-	void* cam = GetCameraComponent(self, &mySkater);
-	if (!cam || !mySkater) { printLog("CFunc_BetterObserve: missing cam or own skater\n"); return 1; }
-
-	SetCamMode(cam, 0, 2, 0.0f);
-	SetCamSkater(cam, 0, targetSkater);
-	local_observing = 1;
-	local_observe_target = target;
-	voluntary_observing = 0;
-
-	return 1;
-}
-
-
-int ObserveCamCycle(int direction) {
-	void* gamenetManager = *(void**)PARTY_ADDR_GAMENET_MANAGER;
-	void* self = gamenetManager ? GetLocalPlayer(gamenetManager) : 0;
-	if (!self) { printLog("ObserveCamCycle: no local player\n"); return 1; }
-
-	void* mySkater = 0;
-	void* cam = GetCameraComponent(self, &mySkater);
-	if (!cam || !mySkater) { printLog("ObserveCamCycle: missing cam or own skater\n"); return 1; }
-
-	void* players[8];
-	int count = 0;
-	players[count++] = self;
-
-	struct { void* vtable; void* dummy; } searchCtx = { (void*)0x0058aa94, 0 };
-	void* p = FirstPlayerInfo(gamenetManager, 0, &searchCtx, '\x01');
-	while (p != 0 && count < 8) 
-	{
-		if (p != self && !IsLocalPlayer_(p) && !IsObserving_(p)) {players[count++] = p;}
-		p = NextPlayerInfo(&searchCtx);
-	}
-
-	if (count <= 1) { printLog("ObserveCamCycle: no other active players to cycle to\n"); return 1; }
-
-	int current = 0;
-	if (local_observe_target) 
-	{
-		for (int i = 0; i < count; i++) 
-		{
-			if (players[i] == local_observe_target) { current = i; break; }
-		}
-	}
-	int newIndex = ((current + direction) % count + count) % count;
-	void* target = players[newIndex];
-	bool willBeSelf = (newIndex == 0);
-
-	void* targetSkater = willBeSelf ? mySkater : *(void**)((uint8_t*)target + 0x14);
-	if (!targetSkater) { printLog("ObserveCamCycle: target has no skater\n"); return 1; }
-
-	SetCamMode(cam, 0, 2, 0.0f);
-	SetCamSkater(cam, 0, targetSkater);
-	local_observe_target = willBeSelf ? 0 : target;
-
-	return 1;
-}
-
-
-
-typedef void(__fastcall* WriteCamFlagByte_t)(void* cameraComponent, int unused, uint8_t param);
-static WriteCamFlagByte_t WriteCamFlagByte = (WriteCamFlagByte_t)0x004d9b80;
- 
-int __cdecl CFunc_DisableLocalPlayerInput(CStruct* params) {
-	void* gamenetManager = *(void**)PARTY_ADDR_GAMENET_MANAGER;
-	void* self = gamenetManager ? GetLocalPlayer(gamenetManager) : 0;
-	if (!self) { printLog("CFunc_DisableLocalPlayerInput: no local player\n"); return 1; }
- 
-	void* mySkater = *(void**)((uint8_t*)self + 0x14);
-	if (!mySkater) { printLog("CFunc_DisableLocalPlayerInput: no skater\n"); return 1; }
- 
-	*(uint8_t*)((uint8_t*)mySkater + 0x97a) = 1;
-	return 1;
-}
- 
-int __cdecl CFunc_EnableLocalPlayerInput(CStruct* params) {
-	void* gamenetManager = *(void**)PARTY_ADDR_GAMENET_MANAGER;
-	void* self = gamenetManager ? GetLocalPlayer(gamenetManager) : 0;
-	if (!self) { printLog("CFunc_EnableLocalPlayerInput: no local player\n"); return 1; }
- 
-	void* mySkater = *(void**)((uint8_t*)self + 0x14);
-	if (!mySkater) { printLog("CFunc_EnableLocalPlayerInput: no skater\n"); return 1; }
- 
-	*(uint8_t*)((uint8_t*)mySkater + 0x97a) = 0;
- 
-	if (*(void**)((uint8_t*)mySkater + 0x37c4) == 0) {
-		void* cam = *(void**)((uint8_t*)mySkater + 0x37d4);
-		if (cam) WriteCamFlagByte(cam, 0, 1);
-	}
-	return 1;
-}
-
-void ObsInputDisabled(void) {
-	if (!local_observing) return;
-
-	void* gamenetManager = *(void**)PARTY_ADDR_GAMENET_MANAGER;
-	void* self = gamenetManager ? GetLocalPlayer(gamenetManager) : 0;
-	if (!self) return;
-
-	void* mySkater = *(void**)((uint8_t*)self + 0x14);
-	if (!mySkater) return;
-
-	*(uint8_t*)((uint8_t*)mySkater + 0x97a) = 1;
-}
-
-
-void patchSerialCheck(void) {
-	patchJmp((void*)0x0048224e, (void*)0x00482394);
-	patchNop((void*)(0x0048224e + 5), 1);
-}
-
-typedef int(__cdecl* CFunc_PrintStruct_t)(CStruct *, int);
-static CFunc_PrintStruct_t CFunc_PrintStruct = (CFunc_PrintStruct_t)0x0041a4c0;
-
-typedef int(__cdecl* CFunc_Change_t)(CStruct *);
-static CFunc_Change_t CFunc_Change = (CFunc_Change_t)0x0050f630;
-
-int __cdecl CFunc_GetIniBool(CStruct *params) {
-	char *section = "";
-	if (!CStruct_GetString(params, 0xd28c8510, &section, 0)) {
-		printLog("GetIniBool missing param \"section\" (0xd28c8510)\n");
-		return 0;
-	}
-
-	char *key = "";
-	if (!CStruct_GetString(params, 0x756f5456, &key, 0)) {
-		printLog("GetIniBool missing param \"key\" (0x756f5456)\n");
-		return 0;
-	}
-
-	return getIniBool(section, key, 0, configFile);
-}
-
-int __cdecl CFunc_GetIniInteger(CStruct *params, CScript *script) {
-	char *section = "";
-	if (!CStruct_GetString(params, 0xd28c8510, &section, 0)) {
-		printLog("GetIniInteger missing param \"section\" (0xd28c8510)\n");
-		return 0;
-	}
-
-	char *key = "";
-	if (!CStruct_GetString(params, 0x756f5456, &key, 0)) {
-		printLog("GetIniInteger missing param \"key\" (0x756f5456)\n");
-		return 0;
-	}
-
-	uint32_t value_name_checksum = 0;
-	if (!CStruct_GetChecksum(params, 0xbf4212ef, &value_name_checksum, 0)) {
-		// NOTE: checksum is for lowercase "valuename"; seemingly case insensitive
-		printLog("GetIniInteger missing param \"ValueName\" (0xbf4212ef)\n");
-		return 0;
-	}
-
-	float def_f = 0;
-	CStruct_GetFloat(params, 0xcee685bd, &def_f, 0); // "fallback" (0xcee685bd)
-	int def = (int)def_f;
-	int ini_value = GetPrivateProfileInt(section, key, def, configFile);
-
-	CStruct *out = CScript_GetParams(script);
-	CStruct_AddInteger(out, value_name_checksum, ini_value);
-
-	return 1;
-}
-
-int __cdecl CFunc_SetIniBool(CStruct *params, CScript *script) {
-	char *section = "";
-	if (!CStruct_GetString(params, 0xd28c8510, &section, 0)) {
-		printLog("SetIniBool missing param \"section\" (0xd28c8510)\n");
-		return 0;
-	}
-
-	char *key = "";
-	if (!CStruct_GetString(params, 0x756f5456, &key, 0)) {
-		printLog("SetIniBool missing param \"key\" (0x756f5456)\n");
-		return 0;
-	}
-
-	float value = 0;
-	if (!CStruct_GetFloat(params, 0xe288a7cb, &value, 0)) {
-		printLog("SetIniBool missing param \"value\" (0xe288a7cb)\n");
-		return 0;
-	}
-
-	char *value_str;
-	if ((int)value) {
-		value_str = "1";
-	} else {
-		value_str = "0";
-	}
-
-	WritePrivateProfileStringA(section, key, value_str, configFile);
-
-	return 1;
-}
-
-int __cdecl CFunc_SetIniInteger(CStruct *params, CScript *script) {
-	char *section = "";
-	if (!CStruct_GetString(params, 0xd28c8510, &section, 0)) {
-		printLog("SetIniInteger missing param \"section\" (0xd28c8510)\n");
-		return 0;
-	}
-
-	char *key = "";
-	if (!CStruct_GetString(params, 0x756f5456, &key, 0)) {
-		printLog("SetIniInteger missing param \"key\" (0x756f5456)\n");
-		return 0;
-	}
-
-	float value = 0;
-	if (!CStruct_GetFloat(params, 0xe288a7cb, &value, 0)) {
-		printLog("SetIniInteger missing param \"value\" (0xe288a7cb)\n");
-		return 0;
-	}
-
-	char value_str[1024];
-	sprintf(value_str, "%d", (int)value);
-	WritePrivateProfileStringA(section, key, &value_str, configFile);
-
-	return 1;
-}
-
-// allows you to
-// ```cscript
-// ChangeGlobal name = <name> value = <value>
-// ```
-// since you can't
-// ```cscript
-// Change <name> = <value>
-// ```
-int __cdecl CFunc_ChangeGlobal(CStruct *params, CScript *script) {
-	uint32_t name = 0;
-	if (!CStruct_GetChecksum(params, 0xa1dc81f9, &name, 0)) {
-		printLog("ChangeGlobal missing param \"name\" (0xa1dc81f9)\n");
-		return 0;
-	}
-	CStruct_RemoveComponent(params, 0xa1dc81f9);
-
-	float float_value = 0;
-	uint32_t checksum_value = 0;
-	if (CStruct_GetFloat(params, 0xe288a7cb, &float_value, 0)) {
-		CStruct_RemoveComponent(params, 0xe288a7cb);
-		CStruct_AddFloat(params, name, float_value);
-	} else if (CStruct_GetChecksum(params, 0xe288a7cb, &checksum_value, 0)) {
-		CStruct_RemoveComponent(params, 0xe288a7cb);
-		CStruct_AddChecksum(params, name, checksum_value);
-	} else {
-		printLog("ChangeGlobal missing param \"value\" (0xe288a7cb)\n");
-		return 0;
-	}
-
-	CFunc_Change(params);
-
-	return 1;
-}
-
-int __cdecl CFunc_GetServerList(CStruct *params, CScript *script) {
-	// XXX (ellie): Max 256 servers, 256 bytes each, potential for buffer overflow but surely we'll be fine... right?
-	char servers[256][256] = {{0}};
-	uint32_t num_servers = 0;
-
-	gslist("thps4pc", "\\hostname\\gamever\\gametype\\gamemode\\mapname\\numplayers", servers, &num_servers);
-
-	CArray *array = CArray_New();
-	CArray_SetSizeAndType(array, num_servers, TYPE_STRUCTURE);
-
-	for (int i = 0; i < num_servers; i++) {
-		char ip[16] = "",
-		     hostname[64] = "",
-			 gamever[64] = "",
-		     gametype[64] = "",
-		     gamemode[64] = "",
-			 mapname[64] = "",
-		     numplayers[64] = "";
-		uint32_t port = 0;
-
-		char *server = servers[i];
-		// TODO: use sscanf_s
-		sscanf(server, "%[^:]:%d \\hostname\\%[^\\]\\gamever\\%[^\\]\\gametype\\%[^\\]\\gamemode\\%[^\\]\\mapname\\%[^\\]\\numplayers\\%[^\\]", ip, &port, hostname, gamever, gametype, gamemode, mapname, numplayers);
-
-		printLog("Server %d (%d chars): %s\n", i, strlen(server), server);
-		printLog("Server %d: %s:%d hostname=%s gamever=%s gametype=%s gamemode=%s mapname=%s numplayers=%s\n", i, ip, port, hostname, gamever, gametype, gamemode, mapname, numplayers);
-
-		CStruct *struc = CStruct_New();
-		CStruct_AddInteger(struc, 0x7f8c98fe/*index*/, i);
-		CStruct_AddString(struc, 0x5a1c4cd2/*ip*/, ip);
-		CStruct_AddInteger(struc, 0xbc6ea233/*port*/, port);
-		CStruct_AddString(struc, 0x1aae3fee/*hostname*/, hostname);
-		CStruct_AddString(struc, 0x748da1c8/*gamever*/, gamever);
-		CStruct_AddString(struc, 0x2510a2e9/*gametype*/, gametype);
-		CStruct_AddString(struc, 0x3e04b26b/*gamemode*/, gamemode);
-		CStruct_AddString(struc, 0xcdef908e/*mapname*/, mapname);
-		CStruct_AddString(struc, 0x99a30c62/*numplayers*/, numplayers);
-		CArray_SetStructure(array, i, struc);
-		// CStruct_Free(struc);
-	}
-
-	CStruct *out = CScript_GetParams(script);
-	CStruct_AddArray(out, 0x30b77607/*server_list*/, array);
-	CArray_Free(array);
-
-	return 1;
-}
 
 // FIXME: still broken, not sure why
 double ledgeWarpFix(double n) {
@@ -531,7 +82,7 @@ void __fastcall do_ground_friction(void *skater) {
 	float unk = *(float *)(*(int *)((int)skater + 0x634) + 0xe0);
 	float calcFriction = friction * (1.0 / 60.0) * 60.0 / length;
 
-	printLog("ORIG: %f CORRECTED: %f FRAMETIME: %f UNK: %f FRICTION: %f LENGTH: %f CALCFRICTION: %f\n", origFriction, correctedFriction, frametime, unk, friction, length, calcFriction);*/
+	printf("ORIG: %f CORRECTED: %f FRAMETIME: %f UNK: %f FRICTION: %f LENGTH: %f CALCFRICTION: %f\n", origFriction, correctedFriction, frametime, unk, friction, length, calcFriction);*/
 
 	if (!handle_slope(skater)) {
 		// do the calculation in double to avoid precision issues
@@ -713,8 +264,10 @@ void patchOnlineService(char *configFile) {
 
 	patchDWord(0x00544a1c + 1, masterServerStr);
 
-	printLog("Patched online server: %s\n", domainStr);
+	printf("Patched online server: %s\n", domainStr);
 }
+
+char configFile[1024];
 
 void initPatch() {
 	GetModuleFileName(NULL, &executableDirectory, filePathBufLen);
@@ -727,14 +280,8 @@ void initPatch() {
 
 	sprintf(configFile, "%s%s", executableDirectory, CONFIG_FILE_NAME);
 
-	int isDebug = getIniBool("Miscellaneous", "Debug", 0, configFile);
-
-	if (isDebug) {
-		initializeLogging();
-	}
-
-	printLog("PARTYMOD for THPS4 %d.%d.%d\n", VERSION_NUMBER_MAJOR, VERSION_NUMBER_MINOR, VERSION_NUMBER_FIX);
-	printLog("DIRECTORY: %s\n", executableDirectory);
+	printf("PARTYMOD for THPS4 %d.%d.%d\n", VERSION_NUMBER_MAJOR, VERSION_NUMBER_MINOR, VERSION_NUMBER_FIX);
+	printf("DIRECTORY: %s\n", executableDirectory);
 
 	//patchResolution();
 
@@ -742,7 +289,7 @@ void initPatch() {
 
 	/*int disableMovies = getIniBool("Miscellaneous", "NoMovie", 0, configFile);
 	if (disableMovies) {
-		printLog("Disabling movies\n");
+		printf("Disabling movies\n");
 		patchNoMovie();
 	}*/
 
@@ -778,29 +325,7 @@ void initPatch() {
 	rng_seed = time(NULL) & 0xffffffff;
 	srand(rng_seed);
 
-	initCFuncs();
-	addCFunc("ObserveSelf", (void *)CFunc_ObserveSelf);
-	addCFunc("IsBetterObserving", (void *)CFunc_IsBetterObserving);
-	addCFunc("ObserveAfter0", (void*)CFunc_ObserveAfter0);
-	addCFunc("BetterObserve", (void *)CFunc_BetterObserve);
-	addCFunc("IsVoluntaryObserving", (void*)CFunc_IsVoluntaryObserving);
-	addCFunc("DisableLocalPlayerInput", (void *)CFunc_DisableLocalPlayerInput);
-	addCFunc("EnableLocalPlayerInput", (void *)CFunc_EnableLocalPlayerInput);
-	addCFunc("GetIniBool", (void *)CFunc_GetIniBool);
-	addCFunc("GetIniInteger", (void *)CFunc_GetIniInteger);
-	addCFunc("SetIniBool", (void *)CFunc_SetIniBool);
-	addCFunc("SetIniInteger", (void *)CFunc_SetIniInteger);
-	addCFunc("ChangeGlobal", (void *)CFunc_ChangeGlobal);
-	addCFunc("SetSpinKeysControl", (void *)CFunc_SetSpinKeysControl);
-	addCFunc("SetSpineTransferControl", (void *)CFunc_SetSpineTransferControl);
-	addCFunc("GetServerList", (void *)CFunc_GetServerList);
-	addCFunc("SetPauseOnUnfocus", (void *)CFunc_SetPauseOnUnfocus);
-	if (isDebug) {
-	    printCFuncs();
-	}
-	patchCFuncs();
-
-	printLog("Patch Initialized\n");
+	printf("Patch Initialized\n");
 }
 
 uint8_t did_logic = 0;
@@ -885,52 +410,6 @@ void patchFrameCap() {
 
 void patchIsPs2() {
 	patchByte(0x00510e38, 0xeb);
-}
-
-void patchPrintf() {
-	// these all seem to crash the game.  oh well!
-	//patchCall(0x00535ef0, printLog);
-	//patchByte(0x00535ef0, 0xe9);	// CALL to JMP
-	
-	// patchCall(0x00405b60, printLog);
-	// patchByte(0x00405b60, 0xe9);	// CALL to JMP
-}
-
-void patchScriptPrintf() {
-	// Patching OurPrintf (0x00535ef0) or 0x00405b60 gives partial success but crashes
-	// the game when entering the main menu. Instead, patch individual call sites in
-	// CFuncs::ScriptPrintf (0x0050a1e0) so we can call Printf from qb scripts.
-	patchCall(0x0050a3cb, printLog);
-	patchCall(0x0050a3e5, printLog);
-	patchCall(0x0050a4b5, printLog);
-	patchCall(0x0050a4fb, printLog);
-
-	// And for CFuncs::ScriptPrintStruct (0041a4c0)
-	patchCall(0x0041a4ce, printLog);
-	patchCall(0x0041a4e2, printLog);
-	patchCall(0x0041a4f2, printLog);
-	patchCall(0x0041a522, printLog);
-	patchCall(0x0041a540, printLog);
-	patchCall(0x0041a56c, printLog);
-	patchCall(0x0041a595, printLog);
-	patchCall(0x0041a5ab, printLog);
-	patchCall(0x0041a5cf, printLog);
-	patchCall(0x0041a5fa, printLog);
-	patchCall(0x0041a60c, printLog);
-	patchCall(0x0041a62f, printLog);
-	patchCall(0x0041a667, printLog);
-	patchCall(0x0041a685, printLog);
-	patchCall(0x0041a69e, printLog);
-	patchCall(0x0041a6ad, printLog);
-	patchCall(0x0041a6d1, printLog);
-	patchCall(0x0041a6fb, printLog);
-	patchCall(0x0041a70b, printLog);
-}
-
-void patchButtonsFont() {
-	// Font name is always set to `ButtonsXbox` if the `buttons_font` flag is passed to `LoadFont`
-	// Patch JZ SHORT to JMP SHORT to skip this condition and always load `buttons_font` by name
-	patchByte(0x0046369f, 0xEB);
 }
 
 int isCD() {
@@ -1149,60 +628,33 @@ void patchTagLimit() {
 	End Tag Limit Patch
 */
 
-__declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
-	// Perform actions based on the reason for calling.
-	switch(fdwReason) { 
-		case DLL_PROCESS_ATTACH:
-			// Initialize once for each new process.
-			// Return FALSE to fail DLL load.
+void partyMain() {
+	// install patches
+	patchWindow();
+	patchInput();
+	patchCall((void *)(0x005319ab), &(initPatch));
+	patchScriptHook();
+	patchScreenFlash();
+	patchRandomMusic();
+	patchOnlineFixes();
 
-			// install patches
-			patchWindow();
-			patchInput();
-			patchCall((void *)(0x005319ab), &(initPatch));
-			patchScriptHook();
-			patchScreenFlash();
-			patchRandomMusic();
-			patchOnlineFixes();
+	patchRenderer();
 
-			patchRenderer();
+	//patchAnisotropicFilter();
 
-			//patchAnisotropicFilter();
+	patchUIPositioning();
+	patchMovieBlackBars();
 
-			patchUIPositioning();
-			patchMovieBlackBars();
+	patchVertexBufferCreation();
 
-			patchVertexBufferCreation();
+	patchTagLimit();
 
-			patchTagLimit();
+	// New patch
+	//patchSkipSkaterDestroy();
+	
+	//patchByte((void*)0x488FAB, 12); 
+	//patchJmpTest();
 
-			// New patch
-			patchSerialCheck();
-			//
-		
-			//patchSkipSkaterDestroy();
-		
-			//patchByte((void*)0x488FAB, 12); 
-			//patchJmpTest();
-
-			//patchPrintf();
-			patchScriptPrintf();
-			patchButtonsFont();
-			//patchCD();
-
-			break;
-
-		case DLL_THREAD_ATTACH:
-			// Do thread-specific initialization.
-			break;
-
-		case DLL_THREAD_DETACH:
-			// Do thread-specific cleanup.
-			break;
-
-		case DLL_PROCESS_DETACH:
-			// Perform any necessary cleanup.
-			break;
-	}
-	return TRUE;
+	//patchPrintf();
+	//patchCD();
 }

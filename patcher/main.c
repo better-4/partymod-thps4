@@ -1,6 +1,6 @@
 #include <stdint.h>
-#include <stdio.h>
 #include <errno.h>
+#include <stdio.h>
 #include <conio.h>
 #include <string.h>
 
@@ -9,7 +9,7 @@
 INCBIN(patch, "executable.bps");
 
 #define EXE_NAME "Skate4.exe"
-#define OUTPUT_NAME "THPS4.exe"
+#define OUTPUT_NAME "Better4.exe"
 
 uint32_t crc32(const void *buf, size_t size);
 int applyPatch(uint8_t *patch, size_t patchLen, uint8_t *input, size_t inputLen, uint8_t **output, size_t *outputLen);
