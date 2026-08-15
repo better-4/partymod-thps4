@@ -927,6 +927,12 @@ void patchScriptPrintf() {
 	patchCall(0x0041a70b, printLog);
 }
 
+void patchButtonsFont() {
+	// Font name is always set to `ButtonsXbox` if the `buttons_font` flag is passed to `LoadFont`
+	// Patch JZ SHORT to JMP SHORT to skip this condition and always load `buttons_font` by name
+	patchByte(0x0046369f, 0xEB);
+}
+
 int isCD() {
 	return 0;
 }
@@ -1181,6 +1187,7 @@ __declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, L
 
 			//patchPrintf();
 			patchScriptPrintf();
+			patchButtonsFont();
 			//patchCD();
 
 			break;
