@@ -9,7 +9,7 @@
 INCBIN(patch, "executable.bps");
 
 #define EXE_NAME "Skate4.exe"
-#define OUTPUT_NAME "Better4.exe"
+#define OUTPUT_NAME "better4.exe"
 
 uint32_t crc32(const void *buf, size_t size);
 int applyPatch(uint8_t *patch, size_t patchLen, uint8_t *input, size_t inputLen, uint8_t **output, size_t *outputLen);
@@ -57,14 +57,15 @@ int main(int argc, char **argv) {
 
 			// check crc (again, not using the one in the bps due to multiple valid executables)
 			uint32_t outputcrc = crc32(patchedBuffer, patchedLen);
-			if (outputcrc != 0x528cf068 && outputcrc != 0x3e9468b8 && outputcrc != 0x8705ebb8 && outputcrc != 0xd6bb1c59 && outputcrc != 0xb31af2de && outputcrc != 0x66a8949d) {
+			// TODO (ellie): patch all the output crcs
+			if (outputcrc != 0xb94c2d06) {
 				printf("OUTPUT CRC DOES NOT MATCH EXPECTED: %08x\n", outputcrc);
 				if (!force) {
 					printf("Patch Failed!\n");
 
 					goto end;
 				} else {
-					printf("If this works, let PARTY MAN X know the input and output CRCs (or don't.  i'm not the boss of you)\n");
+					printf("If this works, let ellie know the input and output CRCs (or don't.  i'm not the boss of you)\n");
 				}
 			}
 
@@ -86,6 +87,9 @@ int main(int argc, char **argv) {
 	}
 
 end:
+	printf("Press any key to continue\n");
+	getch();
+
 	return 0;
 }
 

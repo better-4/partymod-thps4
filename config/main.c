@@ -791,7 +791,7 @@ LRESULT pgui_control_wndproc(pgui_control *control, HWND hwnd, UINT uMsg, WPARAM
 
 // config program start
 
-#define CONFIG_FILE_NAME "partymod.ini"
+#define CONFIG_FILE_NAME "better4.ini"
 
 struct displayMode {
 	int width;
