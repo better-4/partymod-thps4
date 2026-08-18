@@ -51,7 +51,7 @@ target_include_directories(partymod PUBLIC
 	${INCLUDES}
 )
 
-add_executable(partyconfig)
+add_executable(partyconfig WIN32)
 
 target_sources(partyconfig PUBLIC config/main.c)
 target_link_libraries(partyconfig PRIVATE 
