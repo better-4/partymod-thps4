@@ -4,7 +4,11 @@
 #include <stdint.h>
 
 #include <config.h>
-#include <log.h>
+#include <patch.h>
+
+// this file is poorly named!  check the bottom for actually relevant stuff
+
+// big, unused patch for re
 #include <patch.h>
 
 // this file is poorly named!  check the bottom for actually relevant stuff
@@ -88,13 +92,13 @@ HRESULT __fastcall SetRenderStateWrapper(uint8_t* device, void* padding, void* a
 
 
 	if (state < 255 && !statechecklist[state]) {
-		printLog("Setting state %d to 0x%08x!\n", state, value);
+		printf("Setting state %d to 0x%08x!\n", state, value);
 		statechecklist[state] = 1;
 		orig_SetRenderState(device, padding, alsodevice, state, value);
 		return D3D_OK;
 	}
 	else if (state > 255) {
-		printLog("!!!!! USED STATE 0x%08x !!!!!\n", state);
+		printf("!!!!! USED STATE 0x%08x !!!!!\n", state);
 		orig_SetRenderState(device, padding, alsodevice, state, value);
 		return D3D_OK;
 	}
@@ -123,7 +127,7 @@ HRESULT __fastcall SetTextureStageStateWrapper(uint8_t* device, void* padding, v
 	changecounter++;
 
 	if (stage != 0) {
-		printLog("NON 0 STAGE!!!! %d\n", stage);
+		printf("NON 0 STAGE!!!! %d\n", stage);
 	}
 
 	//orig_SetTextureStageState(device, padding, alsodevice, stage, type, value);
@@ -136,7 +140,7 @@ HRESULT __fastcall PresentWrapper(uint8_t* device, void* padding, void* alsodevi
 	//restore_state(device, padding, alsodevice);
 
 	//printf("%d state changes in frame!\n", changecounter);
-	printLog("%d draw calls in frame!\n", drawcounter);
+	printf("%d draw calls in frame!\n", drawcounter);
 	changecounter = 0;
 	drawcounter = 0;
 	drawprims = 0;
@@ -205,7 +209,7 @@ HRESULT __fastcall DrawPrimitiveUPWrapper(void* device, void* padding, void* als
 }
 
 HRESULT __fastcall SetStreamSourceWrapper(void* device, void* padding, void* alsodevice, uint32_t streamnumber, void* streamdata, uint32_t stride) {
-	printLog("%d draw calls %d prims for stream! %08x\n", drawcounter, drawprims, streamdata);
+	printf("%d draw calls %d prims for stream! %08x\n", drawcounter, drawprims, streamdata);
 	drawcounter = 0;
 	drawprims = 0;
 
@@ -215,7 +219,7 @@ HRESULT __fastcall SetStreamSourceWrapper(void* device, void* padding, void* als
 }
 
 HRESULT __fastcall CreateVertexBufferWrapper(void* device, void* padding, void* alsodevice, uint32_t length, uint32_t usage, uint32_t fvf, uint32_t pool, void** ppResult) {
-	printLog("CREATING VERTEX BUFFER: LEN: %d, USAGE: 0x%08x, FVF: 0x%08x, POOL: 0x%08x\n", length, usage, fvf, pool);
+	printf("CREATING VERTEX BUFFER: LEN: %d, USAGE: 0x%08x, FVF: 0x%08x, POOL: 0x%08x\n", length, usage, fvf, pool);
 
 	//usage &= 0x208;
 	// idea: if managed and fvf = 0, allocate in big buffer
@@ -224,7 +228,7 @@ HRESULT __fastcall CreateVertexBufferWrapper(void* device, void* padding, void* 
 }
 
 HRESULT __fastcall CreateIndexBufferWrapper(void* device, void* padding, void* alsodevice, uint32_t length, uint32_t usage, uint32_t format, uint32_t pool, void** ppResult) {
-	printLog("CREATING INDEX BUFFER: LEN: %d, USAGE: 0x%08x, FORMAT: 0x%08x, POOL: 0x%08x\n", length, usage, format, pool);
+	printf("CREATING INDEX BUFFER: LEN: %d, USAGE: 0x%08x, FORMAT: 0x%08x, POOL: 0x%08x\n", length, usage, format, pool);
 
 	//usage &= 0x208;
 	pool = 0x01;
@@ -234,7 +238,7 @@ HRESULT __fastcall CreateIndexBufferWrapper(void* device, void* padding, void* a
 
 void install_device_hooks(uint8_t* in_device) {
 	// install hooks to perform better state management
-	printLog("Installing D3D8 Device Hooks\n");
+	printf("Installing D3D8 Device Hooks\n");
 
 	// get device
 	uint8_t* device = *(uint32_t*)in_device;
@@ -283,7 +287,7 @@ void install_device_hooks(uint8_t* in_device) {
 	orig_SetIndices = *(uint32_t*)(device + 0x154);
 	orig_GetIndices = *(uint32_t*)(device + 0x158);
 
-	printLog("INSTALLED CREATE VERTEX BUFFER WRAPPER\n");
+	printf("INSTALLED CREATE VERTEX BUFFER WRAPPER\n");
 
 	patchDWord(device + 0x5c, CreateVertexBufferWrapper);
 	patchDWord(device + 0x60, CreateIndexBufferWrapper);
@@ -328,7 +332,7 @@ int __fastcall createDeviceWrapper(void* id3d8, void* pad, void* id3d8again, uin
 			presentParams[11] = freq;
 			presentParams[12] = interval;
 
-			printLog("REFRESH: %d, SWAP INTERVAL: %d\n", presentParams[11], presentParams[12]);
+			printf("REFRESH: %d, SWAP INTERVAL: %d\n", presentParams[11], presentParams[12]);
 		} else if (config_vsync_mode == 1) {
 			presentParams[11] = 0;
 			presentParams[12] = 1;

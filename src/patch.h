@@ -2,6 +2,7 @@
 #define _PATCH_H_
 
 #include <stdint.h>
+#include <stdio.h>
 
 enum instruction {
     NOP = 0x90,

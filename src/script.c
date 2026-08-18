@@ -53,7 +53,7 @@ uint8_t *__cdecl dumpScript(char *filename) {
 
 			uint8_t *patch = map_get(scriptMap, filename, strlen(filename));
 			if (patch) {
-				printLog("Applying patch for %s\n", filename);
+				printf("Applying patch for %s\n", filename);
 				size_t patchLen = map_getsz(scriptMap, filename, strlen(filename));
 				uint8_t *patchedBuffer = NULL;
 				size_t patchedBufferLen = 0;
@@ -69,7 +69,7 @@ uint8_t *__cdecl dumpScript(char *filename) {
 					fclose(f);
 					free(patchedBuffer);
 
-					printLog("Patch failed! Loading original script\n");
+					printf("Patch failed! Loading original script\n");
 
 					return buffer;
 				}
@@ -87,7 +87,7 @@ uint8_t *__cdecl dumpScript(char *filename) {
 
 		return NULL;
 	} else {
-		printLog("FAILED TO OPEN SCRIPT %s: %s\n", filenameBuffer, strerror(errno));
+		printf("FAILED TO OPEN SCRIPT %s: %s\n", filenameBuffer, strerror(errno));
 
 		return NULL;
 	}
@@ -95,7 +95,7 @@ uint8_t *__cdecl dumpScript(char *filename) {
 
 void registerPatch(char *name, unsigned int sz, char *data) {
 	map_put(scriptMap, name, strlen(name), data, sz);
-	printLog("Registered patch for %s\n", name);
+	printf("Registered patch for %s\n", name);
 }
 
 void initScriptPatches() {
@@ -108,7 +108,7 @@ void initScriptPatches() {
 // NOTE: crashes the game when installed.  
 // i assume pre loading is still broken as it doesn't get anything when it's asking for files that definitely don't exist
 int __cdecl loadFile(char *filename, int *size, void *dst) {
-	printLog("LOADING FILE %s\n", filename);
+	printf("LOADING FILE %s\n", filename);
 
 	// their malloc, have to use this to prevent a crash down the line when the memory is freed
 	void *(__cdecl *mem_malloc)(int) = (void *)0x00534d50;
@@ -121,7 +121,7 @@ int __cdecl loadFile(char *filename, int *size, void *dst) {
 	buffer = Pre_LoadFile(*pre_mgr, NULL, filename, size, dst);
 
 	if (buffer) {
-		printLog("LOADED FROM PRE\n");
+		printf("LOADED FROM PRE\n");
 		return buffer;
 	}
 
@@ -150,12 +150,12 @@ int __cdecl loadFile(char *filename, int *size, void *dst) {
 			return buffer;
 		}
 		
-		printLog("FAILED TO LOAD\n");
+		printf("FAILED TO LOAD\n");
 		fclose(f);
 		return NULL;
 	}
 
-	printLog("COULDN'T LOAD THE FILE IDIOT\n");
+	printf("COULDN'T LOAD THE FILE IDIOT\n");
 	return NULL;
 }
 
@@ -264,14 +264,14 @@ int applyPatch(uint8_t *patch, size_t patchLen, uint8_t *input, size_t inputLen,
 	magicNum[4] = 0;
 
 	if (strcmp(magicNum, "BPS1") != 0) {
-		printLog("BPS magic number doesn't match expected: %s\n", magicNum);
+		printf("BPS magic number doesn't match expected: %s\n", magicNum);
 		return 1;
 	}
 
 	// input size (4 bytes, unsigned)
 	uint32_t inputExpectedSize = decodeNumber(patch, &patchOffset);
 	if (inputExpectedSize != inputLen) {
-		printLog("Patch input of unexpected size!  expected: %d actual: %d\n", inputExpectedSize, inputLen);
+		printf("Patch input of unexpected size!  expected: %d actual: %d\n", inputExpectedSize, inputLen);
 		return 1;
 	}
 
@@ -326,7 +326,7 @@ int applyPatch(uint8_t *patch, size_t patchLen, uint8_t *input, size_t inputLen,
 	inputcrc |= readByte(patch, &patchOffset) << 16;
 	inputcrc |= readByte(patch, &patchOffset) << 24;
 	if (inputcrc != crc32(input, inputLen)) {
-		printLog("INPUT CRC DID NOT MATCH: %x %x\n", inputcrc, crc32(input, inputLen));
+		printf("INPUT CRC DID NOT MATCH: %x %x\n", inputcrc, crc32(input, inputLen));
 	}
 
 	uint32_t outputcrc = 0;
@@ -335,7 +335,7 @@ int applyPatch(uint8_t *patch, size_t patchLen, uint8_t *input, size_t inputLen,
 	outputcrc |= readByte(patch, &patchOffset) << 16;
 	outputcrc |= readByte(patch, &patchOffset) << 24;
 	if (outputcrc != crc32(*output, *outputLen)) {
-		printLog("INPUT CRC DID NOT MATCH: %x %x\n", outputcrc, crc32(*output, *outputLen));
+		printf("INPUT CRC DID NOT MATCH: %x %x\n", outputcrc, crc32(*output, *outputLen));
 	}
 
 	uint32_t patchcrc = 0;
@@ -344,7 +344,7 @@ int applyPatch(uint8_t *patch, size_t patchLen, uint8_t *input, size_t inputLen,
 	patchcrc |= readByte(patch, &patchOffset) << 16;
 	patchcrc |= readByte(patch, &patchOffset) << 24;
 	if (patchcrc != crc32(patch, patchLen - 4)) {
-		printLog("INPUT CRC DID NOT MATCH: %x %x\n", patchcrc, crc32(patch, patchLen));
+		printf("INPUT CRC DID NOT MATCH: %x %x\n", patchcrc, crc32(patch, patchLen));
 	}
 
 	return 0;

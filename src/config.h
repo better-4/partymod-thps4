@@ -3,7 +3,7 @@
 
 #include <SDL2/SDL.h>
 
-#define CONFIG_FILE_NAME "partymod.ini"
+#define CONFIG_FILE_NAME "better4.ini"
 
 struct keybinds {
 	SDL_Scancode menu;
