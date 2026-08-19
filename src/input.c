@@ -11,50 +11,6 @@
 #include <script.h>
 #include <input.h>
 
-// device is +0x100
-typedef struct {
-	uint32_t vtablePtr;
-	//uint32_t node;
-	uint32_t type;
-	uint32_t port;
-	// 16
-	uint32_t slot;
-	uint32_t isValid;
-	uint32_t unk_24;
-	uint8_t controlData[32];	// PS2 format control data
-	uint8_t vibrationData_align[32];
-	uint8_t vibrationData_direct[32];
-	uint8_t vibrationData_max[32];
-	uint8_t vibrationData_oldDirect[32];    // there may be something before this
-	// 160
-	// 176
-	//uint32_t unk4;
-	//uint32_t unk4;
-	//uint32_t unk4;
-	uint8_t unkChunk[100];
-	uint32_t unk5;
-	// 192
-	uint32_t unk6;
-	uint32_t actuatorsDisabled;	// +0x124
-	uint32_t capabilities;	// +0x128
-	uint32_t unk7;	// +0x12c
-	// 208
-	uint32_t num_actuators; // +0x130
-	uint32_t unk8;	// +0x134
-	uint32_t unk9;	// +0x138
-	uint32_t state;	// +0x13c
-	uint32_t test;	// +0x140
-	// 224
-	uint32_t index;	// CORRECT HERE!!	+0x144
-	uint32_t isPluggedIn;	// +0x148
-	uint32_t unplugged_counter;
-	uint32_t unplugged_retry;
-
-	uint32_t pressed;
-	uint32_t start_or_a_pressed;
-	// 238
-} device;
-
 int controllerCount;
 int controllerListSize;
 SDL_GameController **controllerList;
@@ -64,6 +20,8 @@ struct controllerbinds padbinds;
 
 extern void SnapObsCameraBack();
 extern void ObsInputDisabled();
+extern int pause_on_unfocus;
+extern int local_observing;
 
 uint8_t isUsingKeyboard = 1;
 
@@ -243,10 +201,26 @@ uint8_t *addr_isMenuOnScreen = 0x00ab5bac;
 
 uint8_t isInMenu = 0;
 
+
 void pollController(device *dev, SDL_GameController *controller) {
+	static uint8_t prevDpadLeft = 0;
+	static uint8_t prevDpadRight = 0;
+
 	if (SDL_GameControllerGetAttached(controller)) {
 		dev->isValid = 1;
 		dev->isPluggedIn = 1;
+
+		uint8_t dpadLeft = getButton(controller, CONTROLLER_BUTTON_DPAD_LEFT) ? 1 : 0;
+		uint8_t dpadRight = getButton(controller, CONTROLLER_BUTTON_DPAD_RIGHT) ? 1 : 0;
+		if (local_observing) {
+			if (dpadRight && !prevDpadRight) {
+				ObserveCamCycle(1);
+			} else if (dpadLeft && !prevDpadLeft) {
+				ObserveCamCycle(-1);
+			}
+		}
+		prevDpadLeft = dpadLeft;
+		prevDpadRight = dpadRight;
 
 		// buttons
 		if (getButton(controller, padbinds.menu)) {
@@ -508,6 +482,9 @@ uint8_t getKeyState(uint8_t *keyStates, uint8_t key) {
 }
 
 void pollKeyboard(device* dev) {
+	static uint8_t prevKeyboardA = 0;
+	static uint8_t prevKeyboardD = 0;
+
 	dev->isValid = 1;
 	dev->isPluggedIn = 1;
 
@@ -518,6 +495,18 @@ void pollKeyboard(device* dev) {
 	if (*addr_isKeyboardOnScreen && inputsettings.useKeyboardControls) {
 		return;
 	}
+
+	uint8_t keyboardA = getKeyState(keyboardState, SDL_SCANCODE_A) ? 1 : 0;
+	uint8_t keyboardD = getKeyState(keyboardState, SDL_SCANCODE_D) ? 1 : 0;
+	if (local_observing) {
+		if (keyboardD && !prevKeyboardD) {
+			ObserveCamCycle(1);
+		} else if (keyboardA && !prevKeyboardA) {
+			ObserveCamCycle(-1);
+		}
+	}
+	prevKeyboardA = keyboardA;
+	prevKeyboardD = keyboardD;
 
 	// buttons
 	if (getKeyState(keyboardState, keybinds.menu)) {
@@ -753,8 +742,6 @@ void do_text_input(char* text) {
 		}
 	}
 }
-
-extern int pause_on_unfocus;
 
 void processEvent(SDL_Event *e) {
 	switch (e->type) {
