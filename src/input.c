@@ -802,10 +802,10 @@ void processEvent(SDL_Event *e) {
 					*isFocused = 0;
 				}
 			} else if (e->window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-				if (pause_on_unfocus) {
-					uint8_t *recreateDevice = (uint8_t *)0x00aab48e;
-					*recreateDevice = 1;
+				uint8_t *recreateDevice = (uint8_t *)0x00aab48e;
+				*recreateDevice = 1;
 
+				if (pause_on_unfocus) {
 					uint8_t *isFocused = (uint8_t *)0x005a027c;
 					*isFocused = 1;
 				}
