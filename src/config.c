@@ -205,11 +205,11 @@ void patchWindow() {
 
 	patchCall(0x005430ba, writeConfigValues);	// don't load config, use our own
 
-	patchCall(0x00470320, setAspectRatio);
-	patchByte(0x00470320, 0xe9);	// change CALL to JMP
+	//patchCall(0x00470320, setAspectRatio);
+	//patchByte(0x00470320, 0xe9);	// change CALL to JMP
 
-	patchCall(0x00470430, getScreenAngleFactor);
-	patchByte(0x00470430, 0xe9);	// change CALL to JMP
+	//patchCall(0x00470430, getScreenAngleFactor);
+	//patchByte(0x00470430, 0xe9);	// change CALL to JMP
 }
 
 #define GRAPHICS_SECTION "Graphics"
