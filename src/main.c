@@ -13,7 +13,6 @@
 #include <input.h>
 #include <patch.h>
 #include <script.h>
-#include <winsock.h>
 
 #define VERSION_NUMBER_MAJOR 1
 #define VERSION_NUMBER_MINOR 0
