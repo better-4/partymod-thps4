@@ -18,8 +18,8 @@ struct inputsettings inputsettings;
 struct keybinds keybinds;
 struct controllerbinds padbinds;
 
-extern void SnapObsCameraBack();
-extern void ObsInputDisabled();
+//extern void SnapObsCameraBack();
+//extern void ObsInputDisabled();
 extern int pause_on_unfocus;
 extern int local_observing;
 
@@ -210,7 +210,7 @@ void pollController(device *dev, SDL_GameController *controller) {
 		dev->isValid = 1;
 		dev->isPluggedIn = 1;
 
-		uint8_t dpadLeft = getButton(controller, CONTROLLER_BUTTON_DPAD_LEFT) ? 1 : 0;
+		/*uint8_t dpadLeft = getButton(controller, CONTROLLER_BUTTON_DPAD_LEFT) ? 1 : 0;
 		uint8_t dpadRight = getButton(controller, CONTROLLER_BUTTON_DPAD_RIGHT) ? 1 : 0;
 		if (local_observing) {
 			if (dpadRight && !prevDpadRight) {
@@ -220,7 +220,7 @@ void pollController(device *dev, SDL_GameController *controller) {
 			}
 		}
 		prevDpadLeft = dpadLeft;
-		prevDpadRight = dpadRight;
+		prevDpadRight = dpadRight;*/
 
 		// buttons
 		if (getButton(controller, padbinds.menu)) {
@@ -496,7 +496,7 @@ void pollKeyboard(device* dev) {
 		return;
 	}
 
-	uint8_t keyboardA = getKeyState(keyboardState, SDL_SCANCODE_A) ? 1 : 0;
+	/*uint8_t keyboardA = getKeyState(keyboardState, SDL_SCANCODE_A) ? 1 : 0;
 	uint8_t keyboardD = getKeyState(keyboardState, SDL_SCANCODE_D) ? 1 : 0;
 	if (local_observing) {
 		if (keyboardD && !prevKeyboardD) {
@@ -506,7 +506,7 @@ void pollKeyboard(device* dev) {
 		}
 	}
 	prevKeyboardA = keyboardA;
-	prevKeyboardD = keyboardD;
+	prevKeyboardD = keyboardD; */
 
 	// buttons
 	if (getKeyState(keyboardState, keybinds.menu)) {
@@ -909,8 +909,8 @@ void __cdecl processController(device *dev) {
 	}
 
 	// Hooked here so that both kb + controller players run this
-	SnapObsCameraBack();
-	ObsInputDisabled();
+	//SnapObsCameraBack();
+	//ObsInputDisabled();
 
 	dev->controlData[2] = ~dev->controlData[2];
 	dev->controlData[3] = ~dev->controlData[3];
