@@ -132,7 +132,7 @@ void createSDLWindow() {
 	*resolution_setting_x = resX;
 	*resolution_setting_y = resY;
 
-	window = SDL_CreateWindow("THPS4 - PARTYMOD", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, resX, resY, flags);   // TODO: fullscreen
+	window = SDL_CreateWindow("Better4", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, resX, resY, flags);   // TODO: fullscreen
 
 	if (!window) {
 		printf("Failed to create window! Error: %s\n", SDL_GetError());

@@ -1973,7 +1973,7 @@ int main(int argc, char **argv) {
 	cursedSDLSetup();
 	loadSettings();
 
-	pgui_control *window = pgui_window_create(400, 450, "PARTYMOD Configuration");
+	pgui_control *window = pgui_window_create(400, 450, "Better4 Configuration");
 
 	pgui_control *restore_default_button = pgui_button_create(8, window->h - 42 + 8, 96, 26, "Restore Defaults", window);
 	pgui_control *cancel_button = pgui_button_create(window->w - (88 * 2), window->h - 42 + 8, 80, 26, "Cancel", window);
