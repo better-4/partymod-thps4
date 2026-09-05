@@ -837,7 +837,10 @@ void __cdecl processController(device *dev) {
 	uint8_t *otherIsInMenu = 0x00ab752d;
 	//printf("F: 0x%02x, D: 0x%02x\n", *test1, *test2);
 
-	isInMenu = (*addr_isMenuOnScreen || *otherIsInMenu) && inputsettings.useKeyboardControls;
+	uint8_t *any_menu_showing = 0x00ab5baf;
+	uint8_t in_net_game = *((*(uint8_t **)0x00ab5394) + 0x134) & 0x8; // GameNet::Manager->flags & 0x8
+
+	isInMenu = (*addr_isMenuOnScreen || *otherIsInMenu || (in_net_game && *any_menu_showing)) && inputsettings.useKeyboardControls;
 
 	//printf("IS KEYBOARD ON SCREEN: %d\n", isKeyboardTyping());
 	//printf("Processing Controller %d %d %d!\n", dev->index, dev->slot, dev->port);
