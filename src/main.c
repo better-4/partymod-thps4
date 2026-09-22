@@ -482,6 +482,7 @@ struct FixedPendingTricks {
 
 void __fastcall CPendingTricks_CPendingTricks_Wrapper(struct FixedPendingTricks **pending_tricks) {
 	void (__fastcall * CPendingTricks_CPendingTricks)(struct FixedPendingTricks *) = (void *)0x004e0dc0;
+	// printf("CPendingTricks::CPendingTricks\n");
 
 	*pending_tricks = malloc(sizeof(struct FixedPendingTricks));
 
@@ -490,6 +491,7 @@ void __fastcall CPendingTricks_CPendingTricks_Wrapper(struct FixedPendingTricks 
 
 uint8_t __fastcall CPendingTricks_FlushTricks_Wrapper(struct FixedPendingTricks **pending_tricks) {
 	uint8_t (__fastcall * CPendingTricks_FlushTricks)(struct FixedPendingTricks *) = (void *)0x004e0f90;
+	// printf("CPendingTricks::FlushTricks\n");
 
 	(*pending_tricks)->trick_count = 0;
 
@@ -500,6 +502,7 @@ uint32_t lastcount = 0;
 
 uint32_t __fastcall CPendingTricks_TrickOffObject_Wrapper(struct FixedPendingTricks **pending_tricks, void *pad, uint32_t obj) {
 	uint32_t (__fastcall * CPendingTricks_TrickOffObject)(struct FixedPendingTricks *, void *, uint32_t) = (void *)0x004e0dd0;
+	// printf("CPendingTricks::TrickOffObject: trick_count=%d\n", (*pending_tricks)->trick_count);
 
 	if ((*pending_tricks)->trick_count > MAX_PENDING_TRICKS) {
 		(*pending_tricks)->trick_count = MAX_PENDING_TRICKS;
@@ -510,6 +513,7 @@ uint32_t __fastcall CPendingTricks_TrickOffObject_Wrapper(struct FixedPendingTri
 
 uint32_t __fastcall CPendingTricks_WriteToBuffer_Wrapper(struct FixedPendingTricks **pending_tricks, void *pad, uint32_t *buf, uint32_t size) {
 	uint32_t (__fastcall * CPendingTricks_WriteToBuffer)(struct FixedPendingTricks *, void *, uint32_t *, uint32_t) = (void *)0x004e0e90;
+	printf("CPendingTricks::WriteToBuffer: trick_count=%d\n", (*pending_tricks)->trick_count);
 
 	if ((*pending_tricks)->trick_count > MAX_PENDING_TRICKS) {
 		(*pending_tricks)->trick_count = MAX_PENDING_TRICKS;
@@ -531,15 +535,229 @@ void __fastcall CGoalManager_Land_Graffiti(void* goal_manager) {
 	uint32_t last_score_landed = *((uint32_t *)(pScore + 0x18));
 	struct FixedPendingTricks** pending_tricks = (struct FixedPendingTricks**)(local_skater + 0x6f0);
 
+	printf("CGoalManager::Land_Graffiti: trick_count=%d, last_score_landed=%d\n", (*pending_tricks)->trick_count, last_score_landed);
+
 	for (int i = 0; i < (*pending_tricks)->trick_count; i++) {
+		printf("CGoalManager::Land_Graffiti: Got trick object %x\n", (*pending_tricks)->checksums[i]);
 		CGoalManager_GotTrickObject(goal_manager, NULL, (*pending_tricks)->checksums[i], last_score_landed);
 	}
 }
 
 void __fastcall Score_LogTrickObject_Wrapper(void *pScore, void *pad, uint32_t skater_id, uint32_t score, uint32_t trick_count, uint32_t* pending_tricks, uint8_t propagate) {
 	void (__fastcall * Score_LogTrickObject)(void *, void *, uint32_t, uint32_t, uint32_t, struct FixedPendingTricks**, uint8_t) = (void*)0x004f70d0;
+	printf("Score::LogTrickObject: skater_id=%d trick_count=%d score=%d\n", skater_id, trick_count, score);
 
 	Score_LogTrickObject(pScore, pad, skater_id, score, trick_count, pending_tricks, propagate);
+}
+
+// Registered network message handler for opcode 0x3b (the LogTrickObjectRequest
+// message a client sends to the host). Invoked via a stored function pointer
+// (Mdl::Skate::AddNetworkMsgHandlers), not a direct call site, so we intercept
+// it by overwriting the function pointer immediate at both registration sites
+// instead of using patchCall.
+//
+// This exists to test whether incoming trick-object messages are being
+// silently rejected by the sender/receiver sequence-byte check at the top of
+// the original handler (msg[0] must be 1, msg[1] must match the receiver's
+// current GameNet sequence byte) -- a check that has nothing to do with the
+// tag limit patch's trick count, which would explain drops independent of
+// combo size.
+uint32_t Score_LogTrickObjectReceive_Wrapper(char *msg) {
+	uint32_t (*Score_LogTrickObjectReceive)(char *) = (void *)0x004b5810;
+	uint8_t (__fastcall * GameNet_GetLocalSeq)(void *, void *) = (void *)0x0048c360;
+	void **GameNet_Manager_Instance = (void **)0x00ab5394;
+
+	uint8_t flag = msg[0];
+	uint8_t sender_seq = msg[1];
+	uint8_t local_seq = GameNet_GetLocalSeq(*GameNet_Manager_Instance, NULL);
+	uint32_t skater_id = *(uint32_t *)(msg + 4);
+	uint32_t score = *(uint32_t *)(msg + 8);
+	uint32_t trick_count = *(uint32_t *)(msg + 0xc);
+
+	printf("[t=%u] LogTrickObject RECV: flag=%d sender_seq=%d local_seq=%d skater_id=%d score=%d trick_count=%d -> %s\n",
+		GetTickCount(), flag, sender_seq, local_seq, skater_id, score, trick_count,
+		(flag == 1 && sender_seq == local_seq) ? "ACCEPTED" : "REJECTED (seq mismatch)");
+
+	return Score_LogTrickObjectReceive(msg);
+}
+
+// Only 1 in ~6-7 landed combos actually reached the receive handler above,
+// and the one that did was accepted cleanly (sequence bytes matched) -- so
+// the drop isn't happening at the receive-side gate, it's happening before
+// the message ever leaves.
+//
+// NOTE: Ghidra's decompiler gives WRONG pseudocode for FUN_004301f0 (it
+// hallucinates a single-pointer check at this+0x1f68). The real disassembly
+// (confirmed against the function's actual body_start/body_end) shows it
+// walks a linked list rooted at a sentinel node at this+0x1f5c, taking the
+// first real entry after the sentinel, and skips the call to FUN_0042f340
+// entirely (jumps straight to the epilogue, no log, no error) if that walk
+// doesn't find a usable entry. This wrapper just logs the send attempt
+// itself; see LogTrickObjectSend_Inner_Wrapper below for the actual gate.
+void __fastcall LogTrickObjectRequest_Send_Wrapper(void *dest, void *pad, char msgType, uint32_t size, void *buf, int param_4, int param_5, char param_6, char param_7, int param_8) {
+	void (__fastcall * orig)(void *, void *, char, uint32_t, void *, int, int, char, char, int) = (void *)0x004301f0;
+
+	printf("[t=%u] LogTrickObjectRequest SEND: dest=%p size=%d (attempting)\n", GetTickCount(), dest, size);
+
+	orig(dest, pad, msgType, size, buf, param_4, param_5, param_6, param_7, param_8);
+}
+
+// Wraps the CALL 0x0042f340 instruction at 0x004302ae, inside FUN_004301f0's
+// body. This is only reached if FUN_004301f0's internal list-walk (see note
+// above) actually finds a usable entry -- if messages are being dropped by
+// that gate, this log line simply won't appear for a given send attempt,
+// even though LogTrickObjectRequest_Send_Wrapper's "(attempting)" line did.
+// Filtered to opcode 0x3b (';') only, since FUN_004301f0/FUN_0042f340 are
+// generic send functions used by many unrelated message types.
+// 0x0042fefe/0x0042ff10 (see below) turned out to be a shared code path used
+// by many unrelated message types going through this same branch, so their
+// logs were mostly noise from other game traffic, not our trick messages.
+// This flag scopes those two hooks to only fire while we're inside our own
+// synchronous call into FUN_0042f340 (safe: it doesn't recurse/reenter).
+static int g_watchingTrickSend = 0;
+
+void __fastcall LogTrickObjectSend_Inner_Wrapper(void *dest, void *pad, uint32_t routeId, char msgType, uint32_t size, void *buf, int param_5, int param_6, char param_7, char param_8, int param_9) {
+	void (__fastcall * orig)(void *, void *, uint32_t, char, uint32_t, void *, int, int, char, char, int) = (void *)0x0042f340;
+	int isTrickMsg = (msgType == 0x3b);
+
+	if (isTrickMsg) {
+		printf("LogTrickObjectRequest SEND: reached FUN_0042f340, dest=%p routeId=%u size=%d branch=%d\n",
+			dest, routeId, size, param_6);
+		g_watchingTrickSend = 1;
+	}
+
+	orig(dest, pad, routeId, msgType, size, buf, param_5, param_6, param_7, param_8, param_9);
+
+	g_watchingTrickSend = 0;
+}
+
+// FUN_0042f340 is reached on every attempt, but only ~1 in 3 messages
+// actually arrives. Traced the real disassembly (not the decompiler, which
+// led me to the wrong addresses once already -- param_6==2 is actually the
+// FIRST branch checked, falling through at 0x0042f3d0, not the last one).
+// The single-recipient lookup for our routeId (param_1, not 0xff/negative)
+// searches the list at this+0x1f5c for an entry matching routeId, then at
+// 0x0042f708/0x0042f70b checks `*(byte*)(entry+0x5c) & 8`: if that bit is
+// CLEAR it falls through to build+enqueue the message (CALL 0x00430c80 at
+// 0x0042f7ab); if SET it jumps straight past that to the discard check
+// (CALL 0x004341d0 at 0x0042f7c3). These wrap those two real call sites,
+// gated by g_watchingTrickSend since both sites are shared by other message
+// types going through the same branch.
+void __fastcall TrickSend_Enqueued_Wrapper(void *node, void *pad, int param_1) {
+	void (__fastcall * orig)(void *, void *, int) = (void *)0x00430c80;
+	if (g_watchingTrickSend) {
+		printf("LogTrickObjectRequest SEND: FUN_00430c80 -> recipient ready, message WILL be sent\n");
+	}
+	orig(node, pad, param_1);
+}
+
+void __fastcall TrickSend_Discarded_Wrapper(int msgObj) {
+	void (__fastcall * orig)(int) = (void *)0x004341d0;
+	if (g_watchingTrickSend) {
+		printf("LogTrickObjectRequest SEND: FUN_004341d0 -> no ready recipient found, message DISCARDED\n");
+	}
+	orig(msgObj);
+}
+
+// Cross-referenced against the Mac debug build (Net::App::handle_sequenced_messages):
+// FUN_004324a0 is the low-level receive-side gate for ALL "sequenced" channel
+// messages (registered for opcode 7 via Net::Dispatcher::AddHandler at
+// 0x0042d3e3, inside FUN_0042d2b0 -- the same core Net::App init that opens
+// the UDP socket). Every sequenced message, regardless of its real game-level
+// type, passes through here first. Wire format: byte 0 = channel, bytes 1-4 =
+// sequence number. Logic (confirmed matching the Mac source):
+//   - if incoming seq < *(expected_seq[channel]): stale, ignored, return 1
+//   - else: walk the channel's pending list looking for insertion point;
+//     if an entry with the SAME seq already exists, this exact message is
+//     treated as a duplicate and discarded (this is normal/expected --  it's
+//     how a legitimate resend of an already-queued-but-undispatched message
+//     gets deduped, not evidence of a bug on its own)
+//   - otherwise inserted in sorted position, to be drained later once
+//     expected_seq[channel] catches up to it
+//
+// This wraps that gate directly (channel byte 8 = the channel our trick
+// messages use, per FUN_0042f340's per-channel counter at entry+0x74+8*4)
+// to see, for every packet that reaches this point at all: the incoming
+// sequence number, what the receiver currently expects, and the outcome.
+// Since client and server are the same machine (loopback), genuine packet
+// loss should be near-impossible -- if trick-log messages we know were
+// "successfully queued" client-side (see TrickSend_Enqueued_Wrapper) never
+// show up here at all, that proves the loss happens between the send queue
+// and the socket, not in this receive-side logic. If they DO show up here
+// but get treated as stale/duplicate unexpectedly, that points at a sequence
+// bookkeeping bug instead.
+void __cdecl SequencedMsgGate_Wrapper(char *msg) {
+	uint32_t (__cdecl * orig)(char *) = (void *)0x004324a0;
+	uint8_t channel = msg[0];
+
+	if (channel == 8) {
+		uint32_t incoming_seq = *(uint32_t *)(msg + 1);
+		char *expected_base = *(char **)(msg + 0x4008);
+		uint32_t expected_seq = *(uint32_t *)(expected_base + 0x474 + channel * 4);
+		uint8_t submsg_type = (uint8_t)msg[5];
+
+		printf("SequencedMsgGate: channel=8 submsg_type=0x%02x incoming_seq=%u expected_seq=%u -> %s\n",
+			submsg_type, incoming_seq, expected_seq,
+			(incoming_seq < expected_seq) ? "STALE (ignored)" : "in-range (queued or duplicate, see next log)");
+	}
+
+	orig(msg);
+}
+
+// Net::App::process_sequenced_messages (0x0042d770) walks up to 256 channels
+// each tick, draining each channel's queue while the front message's sequence
+// number matches what's expected. Critically: if DispatchMessage returns
+// anything other than 1 for ANY channel, the function returns IMMEDIATELY --
+// every channel after that one (including our channel 8) gets skipped
+// entirely for this tick, even if messages on channel 8 are fully in-order
+// and ready (which SequencedMsgGate already confirmed they are). This wraps
+// DispatchMessage's call site specifically inside process_sequenced_messages
+// (0x0042d8e8, not its other two call sites elsewhere) to log the message
+// type and return code for every channel drained each tick, so we can catch
+// an early abort happening before channel 8 gets its turn.
+int __fastcall ProcessSequencedDispatch_Wrapper(void *dispatcher, void *pad, char *buf) {
+	int (__fastcall * orig)(void *, void *, char *) = (void *)0x00431a80;
+	uint8_t msgtype = (uint8_t)buf[0x4000];
+	int result = orig(dispatcher, pad, buf);
+
+	if (result != 1) {
+		printf("process_sequenced_messages: DispatchMessage(msgtype=0x%02x) returned %d -> ABORTING remaining channels this tick!\n",
+			msgtype, result);
+	} else if (msgtype == 0x3b) {
+		printf("process_sequenced_messages: DispatchMessage(msgtype=0x3b) -> dispatched normally\n");
+	}
+
+	return result;
+}
+
+// ROOT CAUSE: Net::Dispatcher::DispatchMessage's handler search requires
+// (candidate_flags & msg_flags) == msg_flags before it'll actually call a
+// registered handler -- a flags-subset match, not just an opcode match.
+// Our opcode-0x3b handler is registered twice: once from Init with a
+// register-sourced (effectively arbitrary at that point in startup) flags
+// value, and once from Mdl::Skate::AddNetworkMsgHandlers with a FIXED flags
+// value of 0 (confirmed via disassembly: "PUSH 0x0" immediately before the
+// opcode/handler/priority pushes at 0x00500f9e). A candidate registered with
+// flags=0 only matches messages whose own flags happen to also be exactly 0
+// -- everything else silently skips it, and if no other candidate matches
+// either, DispatchMessage just returns 1 ("no handler matched") without ever
+// calling us. This exactly matches what we measured: 11 separate
+// "dispatched normally" calls for msgtype=0x3b, but only 1 actual
+// LogTrickObject RECV.
+//
+// Fix: intercept both AddHandler call sites (can't safely patch the pushed
+// flags value directly -- one of them pushes a register, not an immediate,
+// so overwriting bytes in place isn't safe) and force flags to 0xFFFFFFFF
+// specifically for opcode 0x3b, so it matches every possible msg_flags value.
+void *__fastcall AddHandler_FixTrickObjectFlags_Wrapper(void *dispatcher, void *pad, uint32_t opcode, void *handlerFn, uint32_t flags, void *context, uint32_t priority) {
+	void *(__fastcall * orig)(void *, void *, uint32_t, void *, uint32_t, void *, uint32_t) = (void *)0x00431620;
+
+	if (opcode == 0x3b) {
+		printf("AddHandler: opcode 0x3b registered with flags=0x%x, forcing to 0xffffffff\n", flags);
+		flags = 0xffffffff;
+	}
+
+	return orig(dispatcher, pad, opcode, handlerFn, flags, context, priority);
 }
 
 void patchTagLimit() {
@@ -572,7 +790,7 @@ void patchTagLimit() {
 	patchDWord(0x004e0e75 + 2, MAX_PENDING_TRICKS * sizeof(uint32_t));
 	patchDWord(0x004e0e7c + 2, MAX_PENDING_TRICKS * sizeof(uint32_t));
 
-	// CPendingTricks::WriteToBuffer
+// CPendingTricks::WriteToBuffer
 	patchByte(0x004e0ea6, 0xeb);	// remove bounds check from WriteToBuffer
 	patchCall(0x004d8a57, CPendingTricks_WriteToBuffer_Wrapper);
 	// adjust trick count offset
@@ -588,7 +806,17 @@ void patchTagLimit() {
 	patchDWord(0x004f7010 + 2, (MAX_PENDING_TRICKS * sizeof(uint32_t)) + 0x10);	// expand stack to fit new message
 	patchDWord(0x004f70ba + 2, (MAX_PENDING_TRICKS * sizeof(uint32_t)) + 0x10);	// stack pointer add
 	patchDWord(0x004f7074 + 1, MAX_PENDING_TRICKS * sizeof(uint32_t));	// fix size passed to WritePendingTricks
-	patchDWord(0x004f70a9 + 1, MAX_PENDING_TRICKS * sizeof(uint32_t));	// fix size of msg sent to server
+	// NOTE: 0x004f70a9 used to be patched here too, under the same "fix size of
+	// msg sent to server" assumption. It's NOT a size -- it's forwarded through
+	// FUN_004301f0 -> FUN_0042f340 and stored as *(int*)(queue_node+8), the
+	// sort key FUN_0042f340/FUN_00430c80 use to order this message in the
+	// destination's outbound delivery queue (lower = sent sooner). Scaling it
+	// from 128 to 2048 made every trick-log message look like the lowest
+	// priority thing on the wire, so it only got sent whenever the queue
+	// happened to be otherwise empty -- confirmed by instrumentation: every
+	// attempt reached FUN_00430c80 (successfully queued), but only a small
+	// fraction were ever actually received. Leaving this constant alone fixes
+	// delivery; it never needed to scale with MAX_PENDING_TRICKS.
 	
 	// Score::LogTrickObject
 	patchDWord(0x004f70e5 + 2, ((MAX_PENDING_TRICKS * sizeof(uint32_t)) * 2) + 0x48);	// expand stack to fit new message
@@ -621,6 +849,49 @@ void patchTagLimit() {
 	patchDWord(0x004f7350 + 3, (0xd4 - 0x80) + (MAX_PENDING_TRICKS * sizeof(uint32_t)));
 	patchDWord(0x004f7342 + 3, (0xd4 - 0x80) + (MAX_PENDING_TRICKS * sizeof(uint32_t)));
 	patchDWord(0x004f733b + 3, (0xd0 - 0x80) + (MAX_PENDING_TRICKS * sizeof(uint32_t)));
+
+	// DEBUG: instrument the receive-side handler for the LogTrickObjectRequest
+	// message (opcode 0x3b) by redirecting both of its registration sites
+	// (Mdl::Skate::AddNetworkMsgHandlers, called once from Init and once from
+	// FUN_00500cd0) to log the sequence-byte check before forwarding to the
+	// original handler.
+	patchDWord(0x004cd22e + 1, Score_LogTrickObjectReceive_Wrapper);
+	patchDWord(0x00500fa0 + 1, Score_LogTrickObjectReceive_Wrapper);
+
+	// DEBUG: instrument LogTrickObjectRequest's call into the low-level send
+	// function to check whether messages are being silently dropped before
+	// they ever leave the client (see wrapper comment above).
+	patchCall(0x004f70b2, LogTrickObjectRequest_Send_Wrapper);
+
+	// DEBUG: instrument FUN_004301f0's internal call into FUN_0042f340, which
+	// only happens if its internal list-walk gate passes. Comparing this
+	// against the "(attempting)" log above tells us whether messages are
+	// being silently gated out inside FUN_004301f0 itself.
+	patchCall(0x004302ae, LogTrickObjectSend_Inner_Wrapper);
+
+	// DEBUG: instrument the two outcomes of FUN_0042f340's single-recipient
+	// lookup branch (see wrapper comments above) to see whether messages are
+	// being discarded because no ready recipient was found.
+	patchCall(0x0042f7ab, TrickSend_Enqueued_Wrapper);
+	patchCall(0x0042f7c3, TrickSend_Discarded_Wrapper);
+
+	// DEBUG: instrument the actual receive-side sequencing gate (see wrapper
+	// comment above), registered via a stored function pointer (not a direct
+	// call site) at 0x0042d3e3 inside FUN_0042d2b0's core Net::App init.
+	patchDWord(0x0042d3e3 + 1, SequencedMsgGate_Wrapper);
+
+	// DEBUG: instrument the DispatchMessage call site inside
+	// Net::App::process_sequenced_messages specifically (see wrapper comment
+	// above) to catch the 256-channel drain loop aborting early, before
+	// channel 8 (our trick messages) gets a turn.
+	patchCall(0x0042d8e8, ProcessSequencedDispatch_Wrapper);
+
+	// FIX: force the opcode-0x3b handler registration's flags to 0xffffffff
+	// at both call sites (Init and Mdl::Skate::AddNetworkMsgHandlers) so
+	// DispatchMessage's flags-subset check always matches (see wrapper
+	// comment above for the root cause this addresses).
+	patchCall(0x004cd237, AddHandler_FixTrickObjectFlags_Wrapper);
+	patchCall(0x00500fa9, AddHandler_FixTrickObjectFlags_Wrapper);
 }
 
 /*
