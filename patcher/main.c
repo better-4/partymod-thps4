@@ -236,7 +236,9 @@ int applyPatch(uint8_t *patch, size_t patchLen, uint8_t *input, size_t inputLen,
 				int32_t offset = decodeNumber(patch, &patchOffset);
 				offset = (offset & 0x01) ? -(offset >> 1) : (offset >> 1);
 				outOffsetAcc += offset;
-				memcpy((*output) + outputOffset, (*output) + outOffsetAcc, segmentLen);
+				for (uint32_t i = 0; i < segmentLen; i++) {
+					(*output)[outputOffset + i] = (*output)[outOffsetAcc + i];
+				}
 				outOffsetAcc += segmentLen;
 				outputOffset += segmentLen;
 				break;
