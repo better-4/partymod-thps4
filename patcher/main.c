@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
 			// check crc (again, not using the one in the bps due to multiple valid executables)
 			uint32_t outputcrc = crc32(patchedBuffer, patchedLen);
 			// TODO (ellie): patch all the output crcs
-			if (outputcrc != 0xb94c2d06 && outputcrc != 0xc65f54fc) {
+			if (outputcrc != 0x9569706a && outputcrc != 0xea7a0990) {
 				printf("OUTPUT CRC DOES NOT MATCH EXPECTED: %08x\n", outputcrc);
 				if (!force) {
 					printf("Patch Failed!\n");
