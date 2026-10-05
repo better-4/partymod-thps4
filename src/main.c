@@ -586,9 +586,9 @@ void patchTagLimit() {
 
 	// Score::LogTrickObjectRequest
 	patchDWord(0x004f7010 + 2, (MAX_PENDING_TRICKS * sizeof(uint32_t)) + 0x10);	// expand stack to fit new message
+	patchDWord(0x004f7042 + 3, (MAX_PENDING_TRICKS * sizeof(uint32_t)) + 0x20);	// fix stack pointer offset
 	patchDWord(0x004f70ba + 2, (MAX_PENDING_TRICKS * sizeof(uint32_t)) + 0x10);	// stack pointer add
 	patchDWord(0x004f7074 + 1, MAX_PENDING_TRICKS * sizeof(uint32_t));	// fix size passed to WritePendingTricks
-	patchDWord(0x004f70a9 + 1, MAX_PENDING_TRICKS * sizeof(uint32_t));	// fix size of msg sent to server
 	
 	// Score::LogTrickObject
 	patchDWord(0x004f70e5 + 2, ((MAX_PENDING_TRICKS * sizeof(uint32_t)) * 2) + 0x48);	// expand stack to fit new message
